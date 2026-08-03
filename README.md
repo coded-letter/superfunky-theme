@@ -29,6 +29,21 @@ Pair this theme with [`superfunky-storefront`](https://github.com/coded-letter/s
 2. Activate the theme in WordPress admin
 3. Navigate to **Appearance → FunkyCommerce** to configure
 
+## Documentation
+
+The complete product documentation covers
+[requirements, setup, customisation, and integrations](./docs/README.md).
+
+Repository maintainers can preview and publish the documentation as an idempotent
+WordPress page tree:
+
+```bash
+node docs/scripts/publish-wordpress-docs.mjs --dry-run
+```
+
+See the [WordPress publishing guide](./docs/scripts/README.md) for Application Password
+setup, draft publication, root-page adoption, and repeatable updates.
+
 ## Free vs Pro
 
 All 170 settings are visible in the Control Center. Free-tier fields work immediately.
