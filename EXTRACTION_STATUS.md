@@ -1,26 +1,37 @@
 # Extraction Status
 
-Tracks what has been migrated from the private `superfunky-woo` monorepo into this
-public repository. Nothing is extracted automatically — every addition here is a
-reviewed, deliberate copy of free-tier-only code.
+Tracks what has been migrated from the private monorepo into this
+public repository. Every addition here is a reviewed, deliberate copy of
+free-tier-only code.
 
 | Date | Module | Status |
 |---|---|---|
-| — | (none yet) | Repository scaffold created; awaiting theme free/Pro split before first extraction. |
+| 2025-08-03 | Full theme (v0.7.0) | ✅ Complete — all PHP files, templates, and schema published |
 
-## Blocking work before the first extraction
+## Free/Pro Tier Summary
 
-The internal theme at
-`workspace/backend/apps/wp-instance/wp-content/themes/funkycommerce-headless` mixes
-free and Pro functionality in the same files (e.g. `functions.php`, `inc/*.php`
-covering crypto payments, the control center, headless login, and build webhooks).
-Before any code lands here it must be split so that only genuinely free-tier
-functionality is copied out — Pro-only code stays in the private monorepo.
+The theme ships with **all** 170 Control Center fields. Each field is annotated with
+`'tier' => 'free'` or `'tier' => 'pro'` in `inc/control-center-schema.php`.
 
-## Process (once the split above is done)
+- **71 free fields** — fully functional without any companion plugin
+- **98 pro fields** — visible but locked; require the FunkyCommerce Pro companion plugin
 
-1. Identify a free-tier module with no dependency on premium/paid functionality.
-2. Copy it here manually (no automated subtree/CI export yet).
-3. Strip any references to premium plugins, internal URLs, or secrets.
-4. Add/adjust the theme's own tests (if any) and this status table in the same change.
-5. Open a PR against this repo for review before merging.
+When Pro is not active, `funkycommerce_is_pro()` returns `false` and:
+- Pro fields show a lock badge + upgrade CTA in the admin UI
+- Pro field values are preserved in the database but not applied
+- The newsletter endpoint remains fully functional (free)
+- The multi-input form endpoint returns a Pro-required notice
+
+## Safety Verification
+
+- ✅ No secrets, API keys, or credentials in extracted code
+- ✅ No premium plugin source code included
+- ✅ All Pro features gated via `funkycommerce_is_pro()` filter (defaults to `false`)
+- ✅ Theme activates and runs without WooCommerce, Polylang, or WPGraphQL
+
+## Process
+
+1. Changes are developed in the private monorepo.
+2. Free-tier code is manually extracted and reviewed.
+3. Premium plugin references and secrets are verified absent.
+4. Code is pushed to this repo with an updated status entry.
