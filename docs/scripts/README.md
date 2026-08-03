@@ -91,7 +91,8 @@ not appear in the process command.
 - native Gutenberg Columns with a 25% navigation column and 75% content column;
 - responsive desktop and mobile navigation with expandable documentation sections;
 - a refined sticky dot-rail table of contents generated from second- and third-level headings;
-- a scoped content script that highlights the current table-of-contents section;
+- a request for the storefront's reviewed documentation behavior, which highlights the
+  current table-of-contents section without executable CMS markup;
 - a hidden source marker used for idempotent updates.
 
 The publisher never deletes pages, uploads media, changes templates, or modifies menus.
@@ -99,10 +100,10 @@ If two WordPress pages contain the same source marker, it stops rather than gues
 which page to overwrite.
 
 The shell uses literal Tailwind class names, mirrored by the official storefront's
-documentation class inventory during its Tailwind build. The table-of-contents script
-is stored in the page content and is idempotent when the headless storefront re-executes
-Gutenberg content scripts. The navigation and anchor links remain functional when
-JavaScript is unavailable.
+documentation class inventory during its Tailwind build. WordPress stores only the
+declarative `data-funky-behavior="docs-navigation"` request; the reviewed interaction is
+bundled by the official storefront and mounted after content rendering. The navigation
+and anchor links remain functional when JavaScript is unavailable.
 The page layout is stored as native Gutenberg Columns. Its navigation, article, and
 table-of-contents fragments use Gutenberg Custom HTML blocks so WordPress does not add
 automatic paragraph or line-break elements that would change the responsive layout.

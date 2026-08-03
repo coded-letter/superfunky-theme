@@ -358,50 +358,6 @@ function tocContent(entries) {
 </aside>`;
 }
 
-const DOCS_TOC_SCRIPT = `<script data-superfunky-docs-script>
-(() => {
-  window.__superfunkyDocumentationTocCleanup?.();
-  const root = document.currentScript?.closest("[data-superfunky-docs-page]");
-  if (!root) return;
-  const links = Array.from(root.querySelectorAll("[data-doc-toc-link]"));
-  const headings = links.map((link) => root.querySelector(link.hash)).filter(Boolean);
-  if (!headings.length) return;
-  const setActive = (id) => links.forEach((link) => {
-    const active = link.hash === "#" + id;
-    link.dataset.active = String(active);
-    if (active) link.setAttribute("aria-current", "location");
-    else link.removeAttribute("aria-current");
-  });
-  const update = () => {
-    const viewportHeight = window.innerHeight;
-    const focusLine = Math.min(Math.max(viewportHeight * 0.15, 112), 160);
-    const positions = headings.map((heading) => ({
-      heading,
-      top: heading.getBoundingClientRect().top,
-      bottom: heading.getBoundingClientRect().bottom,
-    }));
-    const visible = positions.filter(({ top, bottom }) => bottom > 0 && top < viewportHeight);
-    const passedFocus = visible.filter(({ top }) => top <= focusLine);
-    const active = passedFocus.at(-1)?.heading
-      || visible[0]?.heading
-      || positions.filter(({ top }) => top <= focusLine).at(-1)?.heading
-      || headings[0];
-    setActive(active.id);
-  };
-  window.addEventListener("scroll", update, { passive: true });
-  document.addEventListener("scroll", update, { passive: true, capture: true });
-  window.addEventListener("resize", update);
-  window.addEventListener("hashchange", update);
-  window.__superfunkyDocumentationTocCleanup = () => {
-    window.removeEventListener("scroll", update);
-    document.removeEventListener("scroll", update, { capture: true });
-    window.removeEventListener("resize", update);
-    window.removeEventListener("hashchange", update);
-  };
-  update();
-})();
-</script>`;
-
 function sectionTitle(document, documentsBySource) {
   let section = document;
   while (section.parentSource && section.parentSource !== "README.md") {
@@ -424,7 +380,7 @@ export function renderDocumentationPage(document, documents, linkMap) {
 
   return `${marker}
 <!-- wp:columns {"style":{"spacing":{"blockGap":"0"}},"className":"superfunky-docs-layout"} -->
-<div data-superfunky-docs-page="${escapeHtml(document.source)}" class="wp-block-columns superfunky-docs-layout is-layout-flex relative mx-auto flex w-full max-w-[1600px] flex-col items-start gap-0 lg:flex-row lg:flex-nowrap" style="gap:0">
+<div data-superfunky-docs-page="${escapeHtml(document.source)}" data-funky-behavior="docs-navigation" class="wp-block-columns superfunky-docs-layout is-layout-flex relative mx-auto flex w-full max-w-[1600px] flex-col items-start gap-0 lg:flex-row lg:flex-nowrap" style="gap:0">
   <!-- wp:column {"width":"25%","className":"superfunky-docs-navigation-column"} -->
   <div class="wp-block-column superfunky-docs-navigation-column w-full lg:basis-1/4 lg:pr-6 xl:pr-8" style="flex-basis:25%">
     <!-- wp:html -->
@@ -447,7 +403,6 @@ export function renderDocumentationPage(document, documents, linkMap) {
       <div data-doc-article class="grid gap-5 text-base leading-7 text-zinc-700 dark:text-zinc-300 [&_a]:font-semibold [&_a]:text-brand-600 [&_a]:underline-offset-4 hover:[&_a]:underline dark:[&_a]:text-brand-400 [&_blockquote]:m-0 [&_blockquote]:rounded-r-2xl [&_blockquote]:border-l-4 [&_blockquote]:border-brand-500 [&_blockquote]:bg-brand-50/60 [&_blockquote]:px-5 [&_blockquote]:py-4 dark:[&_blockquote]:bg-brand-950/20 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-sm dark:[&_code]:bg-zinc-800 [&_figure]:m-0 [&_h2]:mb-0 [&_h2]:mt-8 [&_h2]:scroll-mt-28 [&_h2]:border-b [&_h2]:border-zinc-200 [&_h2]:pb-3 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:tracking-tight [&_h2]:text-zinc-950 dark:[&_h2]:border-zinc-800 dark:[&_h2]:text-white [&_h3]:mb-0 [&_h3]:mt-6 [&_h3]:scroll-mt-28 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-zinc-950 dark:[&_h3]:text-white [&_li]:my-1 [&_ol]:m-0 [&_ol]:pl-6 [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:bg-zinc-950 [&_pre]:p-5 [&_pre]:text-zinc-100 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:text-zinc-950 dark:[&_strong]:text-white [&_table]:w-full [&_table]:border-collapse [&_td]:border-b [&_td]:border-zinc-200 [&_td]:p-3 [&_td]:align-top dark:[&_td]:border-zinc-800 [&_th]:border-b [&_th]:border-zinc-300 [&_th]:p-3 [&_th]:text-left [&_th]:text-zinc-950 dark:[&_th]:border-zinc-700 dark:[&_th]:text-white [&_ul]:m-0 [&_ul]:pl-6">${article}</div>
     </main>
     ${toc}
-    ${DOCS_TOC_SCRIPT}
     <!-- /wp:html -->
   </div>
   <!-- /wp:column -->

@@ -143,11 +143,8 @@ test("renders a responsive documentation shell with complete navigation and TOC"
   assert.match(html, /<h1[^>]*>Install<\/h1>/);
   assert.match(html, /href="#requirements" data-doc-toc-link/);
   assert.match(html, /aria-label="Requirements"/);
-  assert.match(html, /data-superfunky-docs-script/);
-  assert.match(html, /addEventListener\("scroll", update, \{ passive: true \}\)/);
-  assert.match(html, /document\.addEventListener\("scroll", update, \{ passive: true, capture: true \}\)/);
-  assert.match(html, /const visible = positions\.filter/);
-  assert.match(html, /window\.__superfunkyDocumentationTocCleanup/);
+  assert.match(html, /data-funky-behavior="docs-navigation"/);
+  assert.doesNotMatch(html, /<script\b/);
   assert.match(html, /data-superfunky-docs-page="setup\/install\.md"/);
   assert.match(html, /<!-- wp:columns \{"style":\{"spacing":\{"blockGap":"0"\}\},"className":"superfunky-docs-layout"\} -->/);
   assert.match(html, /class="wp-block-columns[^"]*lg:flex-nowrap" style="gap:0"/);
@@ -180,7 +177,8 @@ test("publishes idempotently and preserves the page tree", async () => {
   assert.equal(wordpress.pages[2].parent, wordpress.pages[1].id);
   assert.match(wordpress.pages[0].content.raw, /\/documentation\/setup\/install\//);
   assert.ok(wordpress.pages.every((page) => page.content.raw.includes("data-superfunky-docs-page")));
-  assert.ok(wordpress.pages.every((page) => page.content.raw.includes("data-superfunky-docs-script")));
+  assert.ok(wordpress.pages.every((page) => page.content.raw.includes('data-funky-behavior="docs-navigation"')));
+  assert.ok(wordpress.pages.every((page) => !page.content.raw.includes("<script")));
 
   const second = await publishDocumentation(options);
   assert.equal(second.created, 0);
