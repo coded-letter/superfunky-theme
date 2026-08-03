@@ -56,8 +56,8 @@ the editor and public page open side by side when tuning global block styles.
 
 ## Tailwind tokens
 
-The storefront Tailwind configuration scans the storefront and shared UI source. It
-includes:
+The storefront Tailwind configuration scans the storefront, shared UI source, and the
+documentation shell's class inventory. It includes:
 
 - `brand-50` through `brand-950`, driven by CSS variables;
 - `bg-brand-gradient` and `bg-brand-gradient-soft`;
@@ -101,6 +101,9 @@ const className = `bg-${colour}-500`;
 Use a typed lookup of complete classes, a CSS variable, or an explicit Tailwind safelist
 when a finite dynamic set is unavoidable. Any Tailwind configuration or source change
 requires a rebuild.
+
+The official documentation shell is already part of the storefront scan. Rebuild the
+storefront after changing its generated class names.
 
 ## Custom block patterns and third-party blocks
 

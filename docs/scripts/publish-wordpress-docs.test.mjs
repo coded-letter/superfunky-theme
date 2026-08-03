@@ -9,6 +9,7 @@ import {
   markdownToHtml,
   parseOptions,
   publishDocumentation,
+  renderDocumentationPage,
 } from "./publish-wordpress-docs.mjs";
 
 const temporaryDirectories = [];
@@ -125,6 +126,31 @@ test("converts supported Markdown and rewrites documentation links", () => {
   assert.doesNotMatch(html, /<h1/);
 });
 
+test("renders a responsive documentation shell with complete navigation and TOC", async () => {
+  const docsDirectory = await createDocs();
+  const documents = await loadDocuments(docsDirectory);
+  const linkMap = new Map([
+    ["README.md", "/documentation/"],
+    ["setup/README.md", "/documentation/setup/"],
+    ["setup/install.md", "/documentation/setup/install/"],
+  ]);
+  const html = renderDocumentationPage(documents[2], documents, linkMap);
+
+  assert.equal((html.match(/aria-current="page"/g) || []).length, 2);
+  assert.equal((html.match(/<a href="\/documentation(?:\/setup(?:\/install)?)?\/"/g) || []).length, 6);
+  assert.equal((html.match(/href="\/documentation\/setup\/"/g) || []).length, 2);
+  assert.equal((html.match(/href="\/documentation\/setup\/install\/"/g) || []).length, 2);
+  assert.match(html, /<h1[^>]*>Install<\/h1>/);
+  assert.match(html, /href="#requirements" data-doc-toc-link/);
+  assert.match(html, /aria-label="Requirements"/);
+  assert.match(html, /data-superfunky-docs-script/);
+  assert.match(html, /IntersectionObserver/);
+  assert.match(html, /window\.__superfunkyDocumentationTocCleanup/);
+  assert.match(html, /data-superfunky-docs-page="setup\/install\.md"/);
+  assert.match(html, /^<!-- wp:html -->/);
+  assert.match(html, /<!-- \/wp:html -->$/);
+});
+
 test("publishes idempotently and preserves the page tree", async () => {
   const docsDirectory = await createDocs();
   const wordpress = await startWordPressServer();
@@ -143,6 +169,8 @@ test("publishes idempotently and preserves the page tree", async () => {
   assert.equal(wordpress.pages[1].parent, wordpress.pages[0].id);
   assert.equal(wordpress.pages[2].parent, wordpress.pages[1].id);
   assert.match(wordpress.pages[0].content.raw, /\/documentation\/setup\/install\//);
+  assert.ok(wordpress.pages.every((page) => page.content.raw.includes("data-superfunky-docs-page")));
+  assert.ok(wordpress.pages.every((page) => page.content.raw.includes("data-superfunky-docs-script")));
 
   const second = await publishDocumentation(options);
   assert.equal(second.created, 0);

@@ -40,6 +40,16 @@ function sourceFromContent(content) {
   return match?.[1]?.trim() ?? null;
 }
 
+function plainText(value) {
+  return String(value)
+    .replace(/<[^>]*>/g, "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#039;", "'");
+}
+
 function firstHeading(markdown, fallback) {
   return markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() || fallback;
 }
@@ -270,6 +280,144 @@ export function markdownToHtml(markdown, { source = "README.md", title, linkMap 
   return `${sourceMarker(source)}\n${rendered.join("\n")}`;
 }
 
+function contentLink(value) {
+  try {
+    const url = new URL(value);
+    return url.search ? value : `${url.pathname}${url.hash}`;
+  } catch {
+    return value;
+  }
+}
+
+function navigationItem(document, currentSource, linkMap) {
+  const active = document.source === currentSource;
+  const linkClass = active
+    ? "flex rounded-xl bg-brand-50 px-3 py-2 font-semibold text-brand-700 ring-1 ring-inset ring-brand-200 dark:bg-brand-950/40 dark:text-brand-300 dark:ring-brand-800"
+    : "flex rounded-xl px-3 py-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-white";
+  const children = document.children.length
+    ? `<ul class="m-0 grid list-none gap-0.5 border-l border-zinc-200 pl-3 dark:border-zinc-800">${document.children
+        .map((child) => navigationItem(child, currentSource, linkMap))
+        .join("")}</ul>`
+    : "";
+  return `<li class="m-0 grid gap-0.5"><a href="${escapeHtml(linkMap.get(document.source))}" class="${linkClass}"${active ? ' aria-current="page"' : ""}>${escapeHtml(document.title)}</a>${children}</li>`;
+}
+
+function navigationContent(documents, currentSource, linkMap) {
+  const root = documents[0];
+  return `<nav aria-label="Superfunky documentation" class="grid gap-4 text-sm">
+  <a href="${escapeHtml(linkMap.get(root.source))}" class="flex items-center gap-3 rounded-2xl bg-zinc-950 px-4 py-3 font-semibold text-white no-underline shadow-sm dark:bg-white dark:text-zinc-950"${root.source === currentSource ? ' aria-current="page"' : ""}>
+    <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-500 text-sm font-black text-white" aria-hidden="true">S</span>
+    <span>Superfunky docs</span>
+  </a>
+  <ul class="m-0 grid list-none gap-3 p-0">${root.children
+    .map((child) => navigationItem(child, currentSource, linkMap))
+    .join("")}</ul>
+</nav>`;
+}
+
+function tableOfContents(articleHtml) {
+  return [...articleHtml.matchAll(/<h([23])\s+id="([^"]+)">([\s\S]*?)<\/h\1>/g)].map(
+    (match) => ({
+      level: Number(match[1]),
+      id: match[2],
+      label: plainText(match[3]),
+    }),
+  );
+}
+
+function tocContent(entries) {
+  if (!entries.length) return "";
+  return `<aside aria-label="On this page" class="fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 xl:flex">
+  <span class="absolute bottom-2 left-1/2 top-2 w-px -translate-x-1/2 bg-zinc-200 dark:bg-zinc-800" aria-hidden="true"></span>
+  <ol class="relative m-0 grid list-none gap-3 p-0">${entries
+    .map(
+      ({ level, id, label }, index) =>
+        `<li class="m-0 flex justify-end${level === 3 ? " pr-0.5" : ""}"><a href="#${escapeHtml(id)}" data-doc-toc-link data-active="${index === 0 ? "true" : "false"}" class="group relative flex h-4 w-4 items-center justify-center rounded-full outline-none" aria-label="${escapeHtml(label)}"${index === 0 ? ' aria-current="location"' : ""}>
+      <span class="pointer-events-none absolute right-6 whitespace-nowrap rounded-lg bg-zinc-950 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 dark:bg-white dark:text-zinc-950">${escapeHtml(label)}</span>
+      <span class="${level === 3 ? "h-1.5 w-1.5" : "h-2.5 w-2.5"} rounded-full bg-zinc-300 ring-4 ring-white transition group-hover:bg-brand-500 group-focus-visible:bg-brand-500 group-data-[active=true]:bg-brand-600 group-data-[active=true]:ring-brand-100 dark:bg-zinc-700 dark:ring-zinc-950 dark:group-data-[active=true]:bg-brand-400 dark:group-data-[active=true]:ring-brand-950" aria-hidden="true"></span>
+    </a></li>`,
+    )
+    .join("")}</ol>
+</aside>`;
+}
+
+const DOCS_TOC_SCRIPT = `<script data-superfunky-docs-script>
+(() => {
+  window.__superfunkyDocumentationTocCleanup?.();
+  const root = document.currentScript?.closest("[data-superfunky-docs-page]");
+  if (!root) return;
+  const links = Array.from(root.querySelectorAll("[data-doc-toc-link]"));
+  const headings = links.map((link) => root.querySelector(link.hash)).filter(Boolean);
+  if (!headings.length) return;
+  const setActive = (id) => links.forEach((link) => {
+    const active = link.hash === "#" + id;
+    link.dataset.active = String(active);
+    if (active) link.setAttribute("aria-current", "location");
+    else link.removeAttribute("aria-current");
+  });
+  const update = () => {
+    const threshold = Math.max(112, window.innerHeight * 0.24);
+    let active = headings[0];
+    for (const heading of headings) {
+      if (heading.getBoundingClientRect().top <= threshold) active = heading;
+      else break;
+    }
+    setActive(active.id);
+  };
+  const observer = new IntersectionObserver(update, { rootMargin: "-15% 0px -70% 0px" });
+  headings.forEach((heading) => observer.observe(heading));
+  window.addEventListener("hashchange", update);
+  window.__superfunkyDocumentationTocCleanup = () => {
+    observer.disconnect();
+    window.removeEventListener("hashchange", update);
+  };
+  update();
+})();
+</script>`;
+
+function sectionTitle(document, documentsBySource) {
+  let section = document;
+  while (section.parentSource && section.parentSource !== "README.md") {
+    section = documentsBySource.get(section.parentSource);
+  }
+  return section.source === "README.md" ? "Overview" : section.title;
+}
+
+export function renderDocumentationPage(document, documents, linkMap) {
+  const articleHtml = markdownToHtml(document.markdown, {
+    source: document.source,
+    title: document.title,
+    linkMap,
+  });
+  const marker = sourceMarker(document.source);
+  const article = articleHtml.replace(marker, "").trim();
+  const navigation = navigationContent(documents, document.source, linkMap);
+  const toc = tocContent(tableOfContents(article));
+  const documentsBySource = new Map(documents.map((record) => [record.source, record]));
+
+  return `<!-- wp:html -->
+${marker}
+<div data-superfunky-docs-page="${escapeHtml(document.source)}" class="relative mx-auto w-full max-w-[1600px]">
+  <details class="group mb-6 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
+    <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl px-3 py-2 font-semibold text-zinc-950 marker:hidden dark:text-white">Browse documentation<span class="text-zinc-400 transition group-open:rotate-180" aria-hidden="true">&#8964;</span></summary>
+    <div class="max-h-[70vh] overflow-y-auto px-1 pb-1 pt-3">${navigation}</div>
+  </details>
+  <div class="grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] xl:gap-12">
+    <aside class="sticky top-24 hidden max-h-[calc(100vh-7rem)] overflow-y-auto pr-2 lg:block">${navigation}</aside>
+    <main class="min-w-0">
+      <header class="mb-10 border-b border-zinc-200 pb-8 dark:border-zinc-800">
+        <p class="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-400">Documentation / ${escapeHtml(sectionTitle(document, documentsBySource))}</p>
+        <h1 class="m-0 text-3xl font-black tracking-tight text-zinc-950 dark:text-white sm:text-4xl">${escapeHtml(document.title)}</h1>
+      </header>
+      <div data-doc-article class="grid gap-5 text-base leading-7 text-zinc-700 dark:text-zinc-300 [&_a]:font-semibold [&_a]:text-brand-600 [&_a]:underline-offset-4 hover:[&_a]:underline dark:[&_a]:text-brand-400 [&_blockquote]:m-0 [&_blockquote]:rounded-r-2xl [&_blockquote]:border-l-4 [&_blockquote]:border-brand-500 [&_blockquote]:bg-brand-50/60 [&_blockquote]:px-5 [&_blockquote]:py-4 dark:[&_blockquote]:bg-brand-950/20 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-sm dark:[&_code]:bg-zinc-800 [&_figure]:m-0 [&_h2]:mb-0 [&_h2]:mt-8 [&_h2]:scroll-mt-28 [&_h2]:border-b [&_h2]:border-zinc-200 [&_h2]:pb-3 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:tracking-tight [&_h2]:text-zinc-950 dark:[&_h2]:border-zinc-800 dark:[&_h2]:text-white [&_h3]:mb-0 [&_h3]:mt-6 [&_h3]:scroll-mt-28 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-zinc-950 dark:[&_h3]:text-white [&_li]:my-1 [&_ol]:m-0 [&_ol]:pl-6 [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:bg-zinc-950 [&_pre]:p-5 [&_pre]:text-zinc-100 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:text-zinc-950 dark:[&_strong]:text-white [&_table]:w-full [&_table]:border-collapse [&_td]:border-b [&_td]:border-zinc-200 [&_td]:p-3 [&_td]:align-top dark:[&_td]:border-zinc-800 [&_th]:border-b [&_th]:border-zinc-300 [&_th]:p-3 [&_th]:text-left [&_th]:text-zinc-950 dark:[&_th]:border-zinc-700 dark:[&_th]:text-white [&_ul]:m-0 [&_ul]:pl-6">${article}</div>
+    </main>
+  </div>
+  ${toc}
+  ${DOCS_TOC_SCRIPT}
+</div>
+<!-- /wp:html -->`;
+}
+
 async function markdownFiles(directory, baseDirectory = directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
@@ -494,11 +642,7 @@ export async function publishDocumentation({
   if (dryRun) {
     const linkMap = previewLinkMap(documents);
     for (const document of documents) {
-      markdownToHtml(document.markdown, {
-        source: document.source,
-        title: document.title,
-        linkMap,
-      });
+      renderDocumentationPage(document, documents, linkMap);
     }
     const statusDescription = status || "new pages draft; existing pages unchanged";
     logger(`WordPress documentation tree (${documents.length} pages, status: ${statusDescription}):`);
@@ -564,10 +708,11 @@ export async function publishDocumentation({
       updated += 1;
       logger(`Updated structure: ${document.source} -> page ${updatedPage.id}`);
     } else {
-      const initialContent = markdownToHtml(document.markdown, {
-        source: document.source,
-        title: document.title,
-      });
+      const initialContent = renderDocumentationPage(
+        document,
+        documents,
+        previewLinkMap(documents),
+      );
       const createdPage = await client.createPage(
         pageStructureBody(document, parentId, newPageStatus, { content: initialContent }),
       );
@@ -578,15 +723,11 @@ export async function publishDocumentation({
   }
 
   const linkMap = new Map(
-    [...publishedPages].map(([source, page]) => [source, page.link]),
+    [...publishedPages].map(([source, page]) => [source, contentLink(page.link)]),
   );
   for (const document of documents) {
     const page = publishedPages.get(document.source);
-    const content = markdownToHtml(document.markdown, {
-      source: document.source,
-      title: document.title,
-      linkMap,
-    });
+    const content = renderDocumentationPage(document, documents, linkMap);
     const finalPage = await client.updatePage(page.id, { content });
     publishedPages.set(document.source, finalPage);
     logger(`Updated content: ${document.source} -> ${finalPage.link}`);

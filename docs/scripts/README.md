@@ -1,7 +1,9 @@
 # Publish the documentation to WordPress
 
 `publish-wordpress-docs.mjs` converts the product Markdown to HTML and creates or updates
-a hierarchical WordPress page tree through the REST API.
+a hierarchical WordPress page tree through the REST API. Each page includes the complete
+documentation navigation, its active state, and an accessible right-side table of
+contents.
 
 ## Requirements
 
@@ -85,9 +87,20 @@ not appear in the process command.
 - page title, slug, parent, menu order, content, and status;
 - section pages from each directory's `README.md`;
 - article pages below their section;
-- internal Markdown links rewritten to the resulting WordPress permalinks;
+- internal Markdown links rewritten to the resulting page paths;
+- a responsive Tailwind documentation shell with desktop and mobile navigation;
+- a sticky dot-rail table of contents generated from second- and third-level headings;
+- a scoped content script that highlights the current table-of-contents section;
 - a hidden source marker used for idempotent updates.
 
 The publisher never deletes pages, uploads media, changes templates, or modifies menus.
 If two WordPress pages contain the same source marker, it stops rather than guessing
 which page to overwrite.
+
+The shell uses literal Tailwind class names, mirrored by the official storefront's
+documentation class inventory during its Tailwind build. The table-of-contents script
+is stored in the page content and is idempotent when the headless storefront re-executes
+Gutenberg content scripts. The navigation and anchor links remain functional when
+JavaScript is unavailable.
+The complete shell is stored as a Gutenberg Custom HTML block so WordPress does not add
+automatic paragraph or line-break elements that would change the responsive layout.
