@@ -88,8 +88,9 @@ not appear in the process command.
 - section pages from each directory's `README.md`;
 - article pages below their section;
 - internal Markdown links rewritten to the resulting page paths;
-- a responsive Tailwind documentation shell with desktop and mobile navigation;
-- a sticky dot-rail table of contents generated from second- and third-level headings;
+- native Gutenberg Columns with a 25% navigation column and 75% content column;
+- responsive desktop and mobile navigation with expandable documentation sections;
+- a refined sticky dot-rail table of contents generated from second- and third-level headings;
 - a scoped content script that highlights the current table-of-contents section;
 - a hidden source marker used for idempotent updates.
 
@@ -102,5 +103,6 @@ documentation class inventory during its Tailwind build. The table-of-contents s
 is stored in the page content and is idempotent when the headless storefront re-executes
 Gutenberg content scripts. The navigation and anchor links remain functional when
 JavaScript is unavailable.
-The complete shell is stored as a Gutenberg Custom HTML block so WordPress does not add
+The page layout is stored as native Gutenberg Columns. Its navigation, article, and
+table-of-contents fragments use Gutenberg Custom HTML blocks so WordPress does not add
 automatic paragraph or line-break elements that would change the responsive layout.

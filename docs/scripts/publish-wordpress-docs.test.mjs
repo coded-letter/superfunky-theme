@@ -144,11 +144,21 @@ test("renders a responsive documentation shell with complete navigation and TOC"
   assert.match(html, /href="#requirements" data-doc-toc-link/);
   assert.match(html, /aria-label="Requirements"/);
   assert.match(html, /data-superfunky-docs-script/);
-  assert.match(html, /IntersectionObserver/);
+  assert.match(html, /addEventListener\("scroll", update, \{ passive: true \}\)/);
+  assert.match(html, /document\.addEventListener\("scroll", update, \{ passive: true, capture: true \}\)/);
+  assert.match(html, /const visible = positions\.filter/);
   assert.match(html, /window\.__superfunkyDocumentationTocCleanup/);
   assert.match(html, /data-superfunky-docs-page="setup\/install\.md"/);
-  assert.match(html, /^<!-- wp:html -->/);
-  assert.match(html, /<!-- \/wp:html -->$/);
+  assert.match(html, /<!-- wp:columns \{"style":\{"spacing":\{"blockGap":"0"\}\},"className":"superfunky-docs-layout"\} -->/);
+  assert.match(html, /class="wp-block-columns[^"]*lg:flex-nowrap" style="gap:0"/);
+  assert.match(html, /<!-- wp:column \{"width":"25%","className":"superfunky-docs-navigation-column"\} -->/);
+  assert.match(html, /<!-- wp:column \{"width":"75%","className":"superfunky-docs-content-column"\} -->/);
+  assert.match(html, /style="flex-basis:25%"/);
+  assert.match(html, /style="flex-basis:75%"/);
+  assert.equal((html.match(/<details class="group\/section rounded-xl"/g) || []).length, 2);
+  assert.equal((html.match(/<details class="group\/section rounded-xl" open>/g) || []).length, 2);
+  assert.match(html, /group-data-\[active=true\]:scale-125/);
+  assert.match(html, /<!-- \/wp:columns -->$/);
 });
 
 test("publishes idempotently and preserves the page tree", async () => {

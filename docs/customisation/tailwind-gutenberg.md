@@ -105,6 +105,9 @@ requires a rebuild.
 The official documentation shell is already part of the storefront scan. Rebuild the
 storefront after changing its generated class names.
 
+Published documentation pages use native Gutenberg Columns: an expandable navigation
+column at 25% and an article column at 75%. The columns stack for narrow viewports.
+
 ## Custom block patterns and third-party blocks
 
 Before approving a block or pattern:

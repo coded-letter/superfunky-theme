@@ -289,17 +289,34 @@ function contentLink(value) {
   }
 }
 
-function navigationItem(document, currentSource, linkMap) {
+function navigationLink(document, currentSource, linkMap, label = document.title) {
   const active = document.source === currentSource;
   const linkClass = active
     ? "flex rounded-xl bg-brand-50 px-3 py-2 font-semibold text-brand-700 ring-1 ring-inset ring-brand-200 dark:bg-brand-950/40 dark:text-brand-300 dark:ring-brand-800"
     : "flex rounded-xl px-3 py-2 text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-white";
-  const children = document.children.length
-    ? `<ul class="m-0 grid list-none gap-0.5 border-l border-zinc-200 pl-3 dark:border-zinc-800">${document.children
-        .map((child) => navigationItem(child, currentSource, linkMap))
-        .join("")}</ul>`
-    : "";
-  return `<li class="m-0 grid gap-0.5"><a href="${escapeHtml(linkMap.get(document.source))}" class="${linkClass}"${active ? ' aria-current="page"' : ""}>${escapeHtml(document.title)}</a>${children}</li>`;
+  return `<a href="${escapeHtml(linkMap.get(document.source))}" class="${linkClass}"${active ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`;
+}
+
+function containsSource(document, source) {
+  return document.source === source || document.children.some((child) => containsSource(child, source));
+}
+
+function navigationSection(document, currentSource, linkMap) {
+  const expanded = containsSource(document, currentSource);
+  return `<li class="m-0">
+    <details class="group/section rounded-xl"${expanded ? " open" : ""}>
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 py-2 font-semibold text-zinc-800 transition marker:hidden hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800/80">
+        <span>${escapeHtml(document.title)}</span>
+        <span class="text-zinc-400 transition group-open/section:rotate-180" aria-hidden="true">&#8964;</span>
+      </summary>
+      <ul class="m-0 ml-3 grid list-none gap-0.5 border-l border-zinc-200 pb-2 pl-3 pt-1 dark:border-zinc-800">
+        <li class="m-0">${navigationLink(document, currentSource, linkMap, "Overview")}</li>
+        ${document.children
+          .map((child) => `<li class="m-0">${navigationLink(child, currentSource, linkMap)}</li>`)
+          .join("")}
+      </ul>
+    </details>
+  </li>`;
 }
 
 function navigationContent(documents, currentSource, linkMap) {
@@ -309,8 +326,8 @@ function navigationContent(documents, currentSource, linkMap) {
     <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-500 text-sm font-black text-white" aria-hidden="true">S</span>
     <span>Superfunky docs</span>
   </a>
-  <ul class="m-0 grid list-none gap-3 p-0">${root.children
-    .map((child) => navigationItem(child, currentSource, linkMap))
+  <ul class="m-0 grid list-none gap-1 p-0">${root.children
+    .map((child) => navigationSection(child, currentSource, linkMap))
     .join("")}</ul>
 </nav>`;
 }
@@ -327,14 +344,14 @@ function tableOfContents(articleHtml) {
 
 function tocContent(entries) {
   if (!entries.length) return "";
-  return `<aside aria-label="On this page" class="fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 xl:flex">
-  <span class="absolute bottom-2 left-1/2 top-2 w-px -translate-x-1/2 bg-zinc-200 dark:bg-zinc-800" aria-hidden="true"></span>
-  <ol class="relative m-0 grid list-none gap-3 p-0">${entries
+  return `<aside aria-label="On this page" class="fixed right-2 top-1/2 z-30 hidden -translate-y-1/2 xl:flex">
+  <span class="absolute bottom-3 left-1/2 top-3 w-px -translate-x-1/2 bg-zinc-200 dark:bg-zinc-800" aria-hidden="true"></span>
+  <ol class="relative m-0 grid list-none gap-1 p-0">${entries
     .map(
       ({ level, id, label }, index) =>
-        `<li class="m-0 flex justify-end${level === 3 ? " pr-0.5" : ""}"><a href="#${escapeHtml(id)}" data-doc-toc-link data-active="${index === 0 ? "true" : "false"}" class="group relative flex h-4 w-4 items-center justify-center rounded-full outline-none" aria-label="${escapeHtml(label)}"${index === 0 ? ' aria-current="location"' : ""}>
-      <span class="pointer-events-none absolute right-6 whitespace-nowrap rounded-lg bg-zinc-950 px-2 py-1 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 dark:bg-white dark:text-zinc-950">${escapeHtml(label)}</span>
-      <span class="${level === 3 ? "h-1.5 w-1.5" : "h-2.5 w-2.5"} rounded-full bg-zinc-300 ring-4 ring-white transition group-hover:bg-brand-500 group-focus-visible:bg-brand-500 group-data-[active=true]:bg-brand-600 group-data-[active=true]:ring-brand-100 dark:bg-zinc-700 dark:ring-zinc-950 dark:group-data-[active=true]:bg-brand-400 dark:group-data-[active=true]:ring-brand-950" aria-hidden="true"></span>
+        `<li class="m-0 flex justify-end"><a href="#${escapeHtml(id)}" data-doc-toc-link data-active="${index === 0 ? "true" : "false"}" class="group relative flex h-7 w-7 items-center justify-center rounded-full outline-none" aria-label="${escapeHtml(label)}"${index === 0 ? ' aria-current="location"' : ""}>
+      <span class="pointer-events-none absolute right-8 whitespace-nowrap rounded-lg bg-zinc-950 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-visible:opacity-100 dark:bg-white dark:text-zinc-950">${escapeHtml(label)}</span>
+      <span class="${level === 3 ? "h-1.5 w-1.5" : "h-2.5 w-2.5"} rounded-full bg-zinc-300 ring-4 ring-white transition group-hover:bg-brand-500 group-focus-visible:bg-brand-500 group-data-[active=true]:scale-125 group-data-[active=true]:bg-brand-600 group-data-[active=true]:ring-brand-100 dark:bg-zinc-700 dark:ring-zinc-950 dark:group-data-[active=true]:bg-brand-400 dark:group-data-[active=true]:ring-brand-950" aria-hidden="true"></span>
     </a></li>`,
     )
     .join("")}</ol>
@@ -356,19 +373,29 @@ const DOCS_TOC_SCRIPT = `<script data-superfunky-docs-script>
     else link.removeAttribute("aria-current");
   });
   const update = () => {
-    const threshold = Math.max(112, window.innerHeight * 0.24);
-    let active = headings[0];
-    for (const heading of headings) {
-      if (heading.getBoundingClientRect().top <= threshold) active = heading;
-      else break;
-    }
+    const viewportHeight = window.innerHeight;
+    const focusLine = Math.min(Math.max(viewportHeight * 0.15, 112), 160);
+    const positions = headings.map((heading) => ({
+      heading,
+      top: heading.getBoundingClientRect().top,
+      bottom: heading.getBoundingClientRect().bottom,
+    }));
+    const visible = positions.filter(({ top, bottom }) => bottom > 0 && top < viewportHeight);
+    const passedFocus = visible.filter(({ top }) => top <= focusLine);
+    const active = passedFocus.at(-1)?.heading
+      || visible[0]?.heading
+      || positions.filter(({ top }) => top <= focusLine).at(-1)?.heading
+      || headings[0];
     setActive(active.id);
   };
-  const observer = new IntersectionObserver(update, { rootMargin: "-15% 0px -70% 0px" });
-  headings.forEach((heading) => observer.observe(heading));
+  window.addEventListener("scroll", update, { passive: true });
+  document.addEventListener("scroll", update, { passive: true, capture: true });
+  window.addEventListener("resize", update);
   window.addEventListener("hashchange", update);
   window.__superfunkyDocumentationTocCleanup = () => {
-    observer.disconnect();
+    window.removeEventListener("scroll", update);
+    document.removeEventListener("scroll", update, { capture: true });
+    window.removeEventListener("resize", update);
     window.removeEventListener("hashchange", update);
   };
   update();
@@ -395,15 +422,23 @@ export function renderDocumentationPage(document, documents, linkMap) {
   const toc = tocContent(tableOfContents(article));
   const documentsBySource = new Map(documents.map((record) => [record.source, record]));
 
-  return `<!-- wp:html -->
-${marker}
-<div data-superfunky-docs-page="${escapeHtml(document.source)}" class="relative mx-auto w-full max-w-[1600px]">
-  <details class="group mb-6 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
-    <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl px-3 py-2 font-semibold text-zinc-950 marker:hidden dark:text-white">Browse documentation<span class="text-zinc-400 transition group-open:rotate-180" aria-hidden="true">&#8964;</span></summary>
-    <div class="max-h-[70vh] overflow-y-auto px-1 pb-1 pt-3">${navigation}</div>
-  </details>
-  <div class="grid items-start gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] xl:gap-12">
+  return `${marker}
+<!-- wp:columns {"style":{"spacing":{"blockGap":"0"}},"className":"superfunky-docs-layout"} -->
+<div data-superfunky-docs-page="${escapeHtml(document.source)}" class="wp-block-columns superfunky-docs-layout is-layout-flex relative mx-auto flex w-full max-w-[1600px] flex-col items-start gap-0 lg:flex-row lg:flex-nowrap" style="gap:0">
+  <!-- wp:column {"width":"25%","className":"superfunky-docs-navigation-column"} -->
+  <div class="wp-block-column superfunky-docs-navigation-column w-full lg:basis-1/4 lg:pr-6 xl:pr-8" style="flex-basis:25%">
+    <!-- wp:html -->
+    <details class="group mb-6 rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
+      <summary class="flex cursor-pointer list-none items-center justify-between rounded-xl px-3 py-2 font-semibold text-zinc-950 marker:hidden dark:text-white">Browse documentation<span class="text-zinc-400 transition group-open:rotate-180" aria-hidden="true">&#8964;</span></summary>
+      <div class="max-h-[70vh] overflow-y-auto px-1 pb-1 pt-3">${navigation}</div>
+    </details>
     <aside class="sticky top-24 hidden max-h-[calc(100vh-7rem)] overflow-y-auto pr-2 lg:block">${navigation}</aside>
+    <!-- /wp:html -->
+  </div>
+  <!-- /wp:column -->
+  <!-- wp:column {"width":"75%","className":"superfunky-docs-content-column"} -->
+  <div class="wp-block-column superfunky-docs-content-column min-w-0 w-full lg:basis-3/4 lg:pl-6 xl:pl-8" style="flex-basis:75%">
+    <!-- wp:html -->
     <main class="min-w-0">
       <header class="mb-10 border-b border-zinc-200 pb-8 dark:border-zinc-800">
         <p class="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-brand-600 dark:text-brand-400">Documentation / ${escapeHtml(sectionTitle(document, documentsBySource))}</p>
@@ -411,11 +446,13 @@ ${marker}
       </header>
       <div data-doc-article class="grid gap-5 text-base leading-7 text-zinc-700 dark:text-zinc-300 [&_a]:font-semibold [&_a]:text-brand-600 [&_a]:underline-offset-4 hover:[&_a]:underline dark:[&_a]:text-brand-400 [&_blockquote]:m-0 [&_blockquote]:rounded-r-2xl [&_blockquote]:border-l-4 [&_blockquote]:border-brand-500 [&_blockquote]:bg-brand-50/60 [&_blockquote]:px-5 [&_blockquote]:py-4 dark:[&_blockquote]:bg-brand-950/20 [&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-sm dark:[&_code]:bg-zinc-800 [&_figure]:m-0 [&_h2]:mb-0 [&_h2]:mt-8 [&_h2]:scroll-mt-28 [&_h2]:border-b [&_h2]:border-zinc-200 [&_h2]:pb-3 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:tracking-tight [&_h2]:text-zinc-950 dark:[&_h2]:border-zinc-800 dark:[&_h2]:text-white [&_h3]:mb-0 [&_h3]:mt-6 [&_h3]:scroll-mt-28 [&_h3]:text-xl [&_h3]:font-bold [&_h3]:text-zinc-950 dark:[&_h3]:text-white [&_li]:my-1 [&_ol]:m-0 [&_ol]:pl-6 [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-2xl [&_pre]:bg-zinc-950 [&_pre]:p-5 [&_pre]:text-zinc-100 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:text-zinc-950 dark:[&_strong]:text-white [&_table]:w-full [&_table]:border-collapse [&_td]:border-b [&_td]:border-zinc-200 [&_td]:p-3 [&_td]:align-top dark:[&_td]:border-zinc-800 [&_th]:border-b [&_th]:border-zinc-300 [&_th]:p-3 [&_th]:text-left [&_th]:text-zinc-950 dark:[&_th]:border-zinc-700 dark:[&_th]:text-white [&_ul]:m-0 [&_ul]:pl-6">${article}</div>
     </main>
+    ${toc}
+    ${DOCS_TOC_SCRIPT}
+    <!-- /wp:html -->
   </div>
-  ${toc}
-  ${DOCS_TOC_SCRIPT}
+  <!-- /wp:column -->
 </div>
-<!-- /wp:html -->`;
+<!-- /wp:columns -->`;
 }
 
 async function markdownFiles(directory, baseDirectory = directory) {
