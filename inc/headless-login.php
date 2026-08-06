@@ -50,7 +50,11 @@ function funkycommerce_graphql_login_user_id() {
 		return 0;
 	}
 
-	$token = $token_manager::validate_token();
+	$auth_header = funkycommerce_graphql_login_auth_header( '' );
+	$token_value = preg_match( '/^Bearer\s+(\S+)$/i', $auth_header, $matches )
+		? $matches[1]
+		: '';
+	$token       = $token_manager::validate_token( $token_value ?: null, false );
 	if ( empty( $token ) || is_wp_error( $token ) || empty( $token->data->user->id ) ) {
 		return 0;
 	}
@@ -67,6 +71,47 @@ function funkycommerce_determine_graphql_login_user( $user_id ) {
 	return ! empty( $user_id ) ? $user_id : funkycommerce_graphql_login_user_id();
 }
 add_filter( 'determine_current_user', 'funkycommerce_determine_graphql_login_user', 98 );
+
+/**
+ * Allow the fallback login-token header on cross-origin Store API requests.
+ */
+function funkycommerce_allow_store_api_login_header( $headers ) {
+	$headers[] = 'X-WPGraphQL-Login-Token';
+	return array_values( array_unique( $headers ) );
+}
+add_filter( 'rest_allowed_cors_headers', 'funkycommerce_allow_store_api_login_header' );
+
+/**
+ * Prevent an expired headless login token from silently producing a guest order.
+ */
+function funkycommerce_validate_store_api_checkout_user( $response, $handler, $request ) {
+	unset( $handler );
+
+	if (
+		is_wp_error( $response )
+		|| ! $request instanceof \WP_REST_Request
+		|| '/wc/store/v1/checkout' !== $request->get_route()
+		|| 'POST' !== $request->get_method()
+	) {
+		return $response;
+	}
+
+	$auth_header = funkycommerce_graphql_login_auth_header( '' );
+	if ( ! preg_match( '/^Bearer\s+\S+$/i', $auth_header ) ) {
+		return $response;
+	}
+
+	if ( funkycommerce_graphql_login_user_id() ) {
+		return $response;
+	}
+
+	return new \WP_Error(
+		'funkycommerce_checkout_authentication_expired',
+		__( 'Your account session expired. Sign in again before placing the order.', 'funkycommerce-headless' ),
+		array( 'status' => 401 )
+	);
+}
+add_filter( 'rest_request_before_callbacks', 'funkycommerce_validate_store_api_checkout_user', 10, 3 );
 
 /**
  * Restore the JWT user after WPGraphQL clears its cached anonymous user.

@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '0.7.0' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '0.7.2' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -123,6 +123,7 @@ require_once get_template_directory() . '/inc/navigation-commerce.php';
 require_once get_template_directory() . '/inc/crypto-payments.php';
 require_once get_template_directory() . '/inc/multilingual-content.php';
 require_once get_template_directory() . '/inc/control-center-schema.php';
+require_once get_template_directory() . '/inc/woocommerce-admin.php';
 require_once get_template_directory() . '/inc/submissions.php';
 require_once get_template_directory() . '/inc/control-center.php';
 require_once get_template_directory() . '/inc/build-webhooks.php';

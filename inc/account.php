@@ -35,10 +35,30 @@ function funkycommerce_account_address( $user_id, $type ) {
 	);
 }
 
+function funkycommerce_link_authenticated_guest_orders( $user_id ) {
+	if ( is_callable( array( 'Auto_Assign_Guest_Orders', 'assign_past_orders_for_authenticated_user' ) ) ) {
+		Auto_Assign_Guest_Orders::assign_past_orders_for_authenticated_user( $user_id );
+	}
+}
+
+/**
+ * Convert WooCommerce price HTML into a GraphQL-safe display string.
+ */
+function funkycommerce_plain_price( $price_html ) {
+	return html_entity_decode(
+		wp_strip_all_tags( $price_html ),
+		ENT_QUOTES | ENT_HTML5,
+		get_bloginfo( 'charset' ) ?: 'UTF-8'
+	);
+}
+
 function funkycommerce_account_orders( $user_id ) {
 	if ( ! function_exists( 'wc_get_orders' ) ) {
 		return array();
 	}
+
+	funkycommerce_link_authenticated_guest_orders( $user_id );
+
 	$orders = wc_get_orders(
 		array(
 			'customer_id' => $user_id,
@@ -59,7 +79,7 @@ function funkycommerce_account_orders( $user_id ) {
 					'name'      => $item->get_name(),
 					'variation' => implode( ', ', $variation ),
 					'quantity'  => (int) $item->get_quantity(),
-					'total'     => wp_strip_all_tags( wc_price( $order->get_line_total( $item, true ), array( 'currency' => $order->get_currency() ) ) ),
+					'total'     => funkycommerce_plain_price( wc_price( $order->get_line_total( $item, true ), array( 'currency' => $order->get_currency() ) ) ),
 				);
 			}
 			$date = $order->get_date_created();
@@ -69,8 +89,9 @@ function funkycommerce_account_orders( $user_id ) {
 				'date'       => $date ? $date->date( DATE_ATOM ) : '',
 				'status'     => $order->get_status(),
 				'statusText' => wc_get_order_status_name( $order->get_status() ),
-				'total'      => wp_strip_all_tags( $order->get_formatted_order_total() ),
+				'total'      => funkycommerce_plain_price( $order->get_formatted_order_total() ),
 				'currency'   => $order->get_currency(),
+				'language'   => (string) $order->get_meta( '_funkycommerce_order_language' ),
 				'items'      => $items,
 			);
 		},
@@ -85,12 +106,15 @@ function funkycommerce_account_payload( $user_id ) {
 	}
 	$roles = (array) $user->roles;
 	$role  = in_array( 'collaborator', $roles, true ) ? 'collaborator' : ( in_array( 'creator', $roles, true ) ? 'creator' : 'member' );
+	$email_verified = ! is_callable( array( 'Auto_Assign_Guest_Orders', 'is_user_email_verified' ) )
+		|| Auto_Assign_Guest_Orders::is_user_email_verified( $user_id );
 	return array(
 		'databaseId'       => $user_id,
 		'displayName'      => $user->display_name,
 		'firstName'        => get_user_meta( $user_id, 'first_name', true ),
 		'lastName'         => get_user_meta( $user_id, 'last_name', true ),
 		'email'            => $user->user_email,
+		'emailVerified'    => $email_verified,
 		'role'             => $role,
 		'profilePublic'    => 'private' !== get_user_meta( $user_id, '_community_profile_visibility', true ),
 		'billingAddress'   => funkycommerce_account_address( $user_id, 'billing' ),
@@ -159,6 +183,7 @@ function funkycommerce_register_account_graphql() {
 				'statusText' => array( 'type' => array( 'non_null' => 'String' ) ),
 				'total'      => array( 'type' => array( 'non_null' => 'String' ) ),
 				'currency'   => array( 'type' => array( 'non_null' => 'String' ) ),
+				'language'   => array( 'type' => array( 'non_null' => 'String' ) ),
 				'items'      => array( 'type' => array( 'list_of' => 'FunkycommerceAccountOrderItem' ) ),
 			),
 		)
@@ -172,6 +197,7 @@ function funkycommerce_register_account_graphql() {
 				'firstName'       => array( 'type' => 'String' ),
 				'lastName'        => array( 'type' => 'String' ),
 				'email'           => array( 'type' => array( 'non_null' => 'String' ) ),
+				'emailVerified'   => array( 'type' => array( 'non_null' => 'Boolean' ) ),
 				'role'            => array( 'type' => array( 'non_null' => 'String' ) ),
 				'profilePublic'   => array( 'type' => array( 'non_null' => 'Boolean' ) ),
 				'billingAddress'  => array( 'type' => 'FunkycommerceAccountAddress' ),
@@ -201,6 +227,7 @@ function funkycommerce_register_account_graphql() {
 				if ( ! function_exists( 'wc_get_order' ) ) {
 					return null;
 				}
+				funkycommerce_link_authenticated_guest_orders( $user_id );
 				$order = wc_get_order( (int) $args['id'] );
 				if ( ! $order || (int) $order->get_customer_id() !== $user_id ) {
 					throw new \GraphQL\Error\UserError( __( 'Order not found.', 'funkycommerce-headless' ) );
@@ -215,7 +242,7 @@ function funkycommerce_register_account_graphql() {
 						'name'      => $item->get_name(),
 						'variation' => implode( ', ', $variation ),
 						'quantity'  => (int) $item->get_quantity(),
-						'total'     => wp_strip_all_tags( wc_price( $order->get_line_total( $item, true ), array( 'currency' => $order->get_currency() ) ) ),
+						'total'     => funkycommerce_plain_price( wc_price( $order->get_line_total( $item, true ), array( 'currency' => $order->get_currency() ) ) ),
 					);
 				}
 				$date = $order->get_date_created();
@@ -225,8 +252,9 @@ function funkycommerce_register_account_graphql() {
 					'date'       => $date ? $date->date( DATE_ATOM ) : '',
 					'status'     => $order->get_status(),
 					'statusText' => wc_get_order_status_name( $order->get_status() ),
-					'total'      => wp_strip_all_tags( $order->get_formatted_order_total() ),
+					'total'      => funkycommerce_plain_price( $order->get_formatted_order_total() ),
 					'currency'   => $order->get_currency(),
+					'language'   => (string) $order->get_meta( '_funkycommerce_order_language' ),
 					'items'      => $items,
 				);
 			},
