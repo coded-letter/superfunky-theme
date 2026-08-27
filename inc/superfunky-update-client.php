@@ -143,6 +143,45 @@ if ( ! class_exists( 'Superfunky_Update_Client', false ) ) {
 		}
 
 		/**
+		 * Return the paid product credential that authorizes a private release.
+		 *
+		 * @param array  $product             Product descriptor.
+		 * @param string $required_product_id Previously bound authorization product.
+		 * @return array|WP_Error
+		 */
+		private static function update_authorization( $product, $required_product_id = '' ) {
+			if ( 'superfunky-licensing' === $product['product_id'] ) {
+				return Superfunky_Licence_Client::get_update_authorization( $required_product_id );
+			}
+			if ( '' !== $required_product_id && $required_product_id !== $product['product_id'] ) {
+				return new WP_Error( 'authorization_product_mismatch', __( 'The cached update authorization belongs to another product.', 'superfunky-licensing' ) );
+			}
+			if ( ! Superfunky_Licence_Client::is_executable( $product['product_id'] ) ) {
+				return new WP_Error( 'licence_not_executable', sprintf( __( 'A current verified %s lease is required to check private updates.', 'superfunky-licensing' ), $product['name'] ) );
+			}
+			$credentials = Superfunky_Licence_Client::get_credentials( $product['product_id'] );
+			if ( is_wp_error( $credentials ) ) {
+				return $credentials;
+			}
+			return array_merge(
+				array( 'productId' => $product['product_id'] ),
+				$credentials
+			);
+		}
+
+		/**
+		 * Determine whether a registered product may request private updates.
+		 *
+		 * @param array $product Product descriptor.
+		 * @return bool
+		 */
+		private static function is_update_authorized( $product ) {
+			return 'superfunky-licensing' === $product['product_id']
+				? Superfunky_Licence_Client::has_update_authorization()
+				: Superfunky_Licence_Client::is_executable( $product['product_id'] );
+		}
+
+		/**
 		 * Build an inert URL intercepted before WordPress downloads it.
 		 *
 		 * @param array $manifest Verified manifest.
@@ -184,35 +223,34 @@ if ( ! class_exists( 'Superfunky_Update_Client', false ) ) {
 		 */
 		private static function refresh_update( $product ) {
 			$licensed = 'licensed' === $product['access'];
-			if ( $licensed && ! Superfunky_Licence_Client::is_executable( $product['product_id'] ) ) {
-				return new WP_Error( 'licence_not_executable', sprintf( __( 'A current verified %s lease is required to check private updates.', 'superfunky-licensing' ), $product['name'] ) );
-			}
-
 			$body = array(
 				'productId'      => $product['product_id'],
 				'currentVersion' => $product['version'],
 			);
 			if ( $licensed ) {
-				$credentials = Superfunky_Licence_Client::get_credentials( $product['product_id'] );
+				$authorization = self::update_authorization( $product );
 				$origin      = Superfunky_Licence_Client::site_origin();
-				if ( is_wp_error( $credentials ) ) {
-					return $credentials;
+				if ( is_wp_error( $authorization ) ) {
+					return $authorization;
 				}
 				if ( is_wp_error( $origin ) ) {
 					return $origin;
 				}
 				$body = array_merge(
 					array(
-						'installationId'     => $credentials['installationId'],
-						'installationSecret' => $credentials['installationSecret'],
+						'installationId'     => $authorization['installationId'],
+						'installationSecret' => $authorization['installationSecret'],
 						'siteUrl'            => $origin,
 					),
 					$body
 				);
+				if ( $authorization['productId'] !== $product['product_id'] ) {
+					$body['authorizationProductId'] = $authorization['productId'];
+				}
 			}
 			$response = Superfunky_Release_Client::api_request( $licensed ? 'release-check' : 'public-release-check', $body, 15 );
-			if ( isset( $credentials['installationSecret'] ) ) {
-				unset( $credentials['installationSecret'], $body['installationSecret'] );
+			if ( isset( $authorization['installationSecret'] ) ) {
+				unset( $authorization['installationSecret'], $body['installationSecret'] );
 			}
 			if ( is_wp_error( $response ) ) {
 				return $response;
@@ -242,23 +280,25 @@ if ( ! class_exists( 'Superfunky_Update_Client', false ) ) {
 				'manifest'   => $manifest,
 			);
 			if ( $licensed ) {
-				$state = Superfunky_Licence_Client::get_state( $product['product_id'] );
+				$authorization_product_id = $authorization['productId'];
+				$state = Superfunky_Licence_Client::get_state( $authorization_product_id );
 				if ( empty( $state['installation_id'] ) ) {
 					return new WP_Error( 'licence_not_installed', __( 'The installation credential is missing.', 'superfunky-licensing' ) );
 				}
-				$lease = Superfunky_Licence_Client::verify_lease( $response['lease'], $product['product_id'], $state['installation_id'], false );
+				$lease = Superfunky_Licence_Client::verify_lease( $response['lease'], $authorization_product_id, $state['installation_id'], false );
 				if (
 					is_wp_error( $lease ) ||
 					$response['leaseExpiresAt'] !== ( $lease['expiresAt'] ?? null ) ||
-					$lease['productId'] !== $manifest['productId']
+					$manifest['productId'] !== $product['product_id']
 				) {
 					return is_wp_error( $lease ) ? $lease : new WP_Error( 'release_lease_mismatch', __( 'The release response does not match its signed lease.', 'superfunky-licensing' ) );
 				}
-				$lease = Superfunky_Licence_Client::cache_verified_lease( $response['lease'], $product['product_id'] );
+				$lease = Superfunky_Licence_Client::cache_verified_lease( $response['lease'], $authorization_product_id );
 				if ( is_wp_error( $lease ) ) {
 					return $lease;
 				}
-				$metadata['lease'] = $response['lease'];
+				$metadata['authorization_product_id'] = $authorization_product_id;
+				$metadata['lease']                    = $response['lease'];
 			}
 			$package = self::package_url( $manifest );
 			if ( is_wp_error( $package ) ) {
@@ -293,12 +333,19 @@ if ( ! class_exists( 'Superfunky_Update_Client', false ) ) {
 				return $manifest;
 			}
 			if ( 'licensed' === $product['access'] ) {
-				$state = Superfunky_Licence_Client::get_state( $product['product_id'] );
+				$authorization_product_id = is_string( $metadata['authorization_product_id'] ?? null )
+					? $metadata['authorization_product_id']
+					: '';
+				$authorization = self::update_authorization( $product, $authorization_product_id );
+				if ( is_wp_error( $authorization ) ) {
+					return $authorization;
+				}
+				$state = Superfunky_Licence_Client::get_state( $authorization['productId'] );
 				$lease = ! empty( $metadata['lease'] ) && ! empty( $state['installation_id'] )
-					? Superfunky_Licence_Client::verify_lease( $metadata['lease'], $product['product_id'], $state['installation_id'], false )
+					? Superfunky_Licence_Client::verify_lease( $metadata['lease'], $authorization['productId'], $state['installation_id'], false )
 					: new WP_Error( 'licence_not_installed', __( 'The installation credential is missing.', 'superfunky-licensing' ) );
-				if ( is_wp_error( $lease ) || ! Superfunky_Licence_Client::is_executable( $product['product_id'] ) ) {
-					return is_wp_error( $lease ) ? $lease : new WP_Error( 'licence_not_executable', __( 'The current signed lease is not executable.', 'superfunky-licensing' ) );
+				if ( is_wp_error( $lease ) ) {
+					return $lease;
 				}
 			}
 			$package = self::package_url( $manifest );
@@ -352,7 +399,7 @@ if ( ! class_exists( 'Superfunky_Update_Client', false ) ) {
 				$product = self::installed_product( $registered_product );
 				$plugin  = plugin_basename( $product['file'] );
 				unset( $transient->response[ $plugin ], $transient->no_update[ $plugin ] );
-				if ( 'licensed' === $product['access'] && ! Superfunky_Licence_Client::is_executable( $product['product_id'] ) ) {
+				if ( 'licensed' === $product['access'] && ! self::is_update_authorized( $product ) ) {
 					continue;
 				}
 				$metadata = self::metadata( $product, $last_checked );
@@ -525,26 +572,32 @@ if ( ! class_exists( 'Superfunky_Update_Client', false ) ) {
 					'assetId'   => $metadata['manifest']['assetId'],
 				);
 				if ( $licensed ) {
-					$credentials = Superfunky_Licence_Client::get_credentials( $product['product_id'] );
+					$authorization_product_id = is_string( $metadata['authorization_product_id'] ?? null )
+						? $metadata['authorization_product_id']
+						: '';
+					$authorization = self::update_authorization( $product, $authorization_product_id );
 					$origin      = Superfunky_Licence_Client::site_origin();
-					if ( is_wp_error( $credentials ) ) {
-						return $credentials;
+					if ( is_wp_error( $authorization ) ) {
+						return $authorization;
 					}
 					if ( is_wp_error( $origin ) ) {
 						return $origin;
 					}
 					$body = array_merge(
 						array(
-							'installationId'     => $credentials['installationId'],
-							'installationSecret' => $credentials['installationSecret'],
+							'installationId'     => $authorization['installationId'],
+							'installationSecret' => $authorization['installationSecret'],
 							'siteUrl'            => $origin,
 						),
 						$body
 					);
+					if ( $authorization['productId'] !== $product['product_id'] ) {
+						$body['authorizationProductId'] = $authorization['productId'];
+					}
 				}
 				$json = wp_json_encode( $body, JSON_UNESCAPED_SLASHES );
-				if ( isset( $credentials['installationSecret'] ) ) {
-					unset( $credentials['installationSecret'], $body['installationSecret'] );
+				if ( isset( $authorization['installationSecret'] ) ) {
+					unset( $authorization['installationSecret'], $body['installationSecret'] );
 				}
 				if ( false === $json ) {
 					return new WP_Error( 'download_request_encode_failed', __( 'The update download request could not be encoded.', 'superfunky-licensing' ) );
@@ -599,7 +652,7 @@ if ( ! class_exists( 'Superfunky_Update_Client', false ) ) {
 				return;
 			}
 			foreach ( self::$products as $product ) {
-				if ( 'licensed' === $product['access'] && ! Superfunky_Licence_Client::is_executable( $product['product_id'] ) ) {
+				if ( 'licensed' === $product['access'] && ! self::is_update_authorized( $product ) ) {
 					$url = add_query_arg( 'page', Superfunky_Licence_Client::ADMIN_PAGE, admin_url( 'admin.php' ) );
 					?>
 					<div class="notice notice-warning">
