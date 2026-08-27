@@ -172,6 +172,7 @@ function funkycommerce_normalize_digital_checkout_request_addresses( $response, 
 		return $response;
 	}
 
+	$billing_address = null;
 	foreach ( array( 'billing_address', 'shipping_address' ) as $address_param ) {
 		$address = $request->get_param( $address_param );
 		if ( ! is_array( $address ) ) {
@@ -183,6 +184,43 @@ function funkycommerce_normalize_digital_checkout_request_addresses( $response, 
 		$address['state']     = 'Digital order';
 		$address['postcode']  = '00000';
 		$request->set_param( $address_param, $address );
+		if ( 'billing_address' === $address_param ) {
+			$billing_address = $address;
+		}
+	}
+
+	if (
+		is_array( $billing_address )
+		&& in_array( $request->get_param( 'payment_method' ), array( 'stripe', 'stripe_blik' ), true )
+	) {
+		$payment_data = $request->get_param( 'payment_data' );
+		if ( is_array( $payment_data ) ) {
+			$required_values = array(
+				'billing_address_1' => $billing_address['address_1'],
+				'billing_city'      => $billing_address['city'],
+				'billing_state'     => $billing_address['state'],
+				'billing_postcode'  => $billing_address['postcode'],
+				'billing_country'   => $billing_address['country'] ?? '',
+				'billing_phone'     => $billing_address['phone'] ?? '',
+			);
+
+			foreach ( $payment_data as &$entry ) {
+				$key = is_array( $entry ) ? (string) ( $entry['key'] ?? '' ) : '';
+				if ( isset( $required_values[ $key ] ) ) {
+					$entry['value'] = $required_values[ $key ];
+					unset( $required_values[ $key ] );
+				}
+			}
+			unset( $entry );
+
+			foreach ( $required_values as $key => $value ) {
+				$payment_data[] = array(
+					'key'   => $key,
+					'value' => $value,
+				);
+			}
+			$request->set_param( 'payment_data', $payment_data );
+		}
 	}
 
 	return $response;
