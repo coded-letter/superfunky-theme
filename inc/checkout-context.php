@@ -101,27 +101,93 @@ function funkycommerce_capture_store_api_checkout_context( $response, $handler, 
 add_filter( 'rest_request_before_callbacks', 'funkycommerce_capture_store_api_checkout_context', 10, 3 );
 
 /**
+ * Whether the active Store API checkout contains only products that do not ship.
+ *
+ * The cart check is authoritative and also covers clients or cached Store API schemas
+ * that do not pass the checkout extension flag through to the endpoint callback.
+ */
+function funkycommerce_is_digital_store_api_checkout() {
+	if ( ! funkycommerce_is_store_api_checkout_request() ) {
+		return false;
+	}
+
+	global $funkycommerce_store_api_digital_order;
+	if ( true === $funkycommerce_store_api_digital_order ) {
+		return true;
+	}
+
+	return function_exists( 'WC' )
+		&& WC()
+		&& WC()->cart
+		&& ! WC()->cart->needs_shipping();
+}
+
+/**
  * Digital orders do not need a geographic billing destination. Keep identity and
  * contact fields required while allowing WooCommerce to validate an empty address.
  */
+function funkycommerce_relax_digital_checkout_default_address_locale( $locale ) {
+	if ( ! funkycommerce_is_digital_store_api_checkout() ) {
+		return $locale;
+	}
+
+	foreach ( array( 'address_1', 'city', 'state', 'postcode' ) as $field ) {
+		if ( isset( $locale[ $field ] ) ) {
+			$locale[ $field ]['required'] = false;
+		}
+	}
+
+	return $locale;
+}
+add_filter( 'woocommerce_get_country_locale_default', 'funkycommerce_relax_digital_checkout_default_address_locale', 100 );
+
+/**
+ * Apply the same relaxation to country-specific overrides.
+ */
 function funkycommerce_relax_digital_checkout_address_locale( $locales ) {
-	global $funkycommerce_store_api_digital_order;
-	if ( ! $funkycommerce_store_api_digital_order || ! funkycommerce_is_store_api_checkout_request() ) {
+	if ( ! funkycommerce_is_digital_store_api_checkout() ) {
 		return $locales;
 	}
 
 	foreach ( $locales as &$locale ) {
-		foreach ( array( 'address_1', 'city', 'state', 'postcode' ) as $field ) {
-			if ( isset( $locale[ $field ] ) ) {
-				$locale[ $field ]['required'] = false;
-			}
-		}
+		$locale = funkycommerce_relax_digital_checkout_default_address_locale( $locale );
 	}
 	unset( $locale );
 
 	return $locales;
 }
 add_filter( 'woocommerce_get_country_locale', 'funkycommerce_relax_digital_checkout_address_locale', 100 );
+
+/**
+ * Populate internal placeholders after Store API schema validation. Empty state and
+ * postcode values avoid country-specific REST validation; WooCommerce's final order
+ * validation still expects non-empty values for locales cached as required.
+ */
+function funkycommerce_normalize_digital_checkout_request_addresses( $response, $handler, $request ) {
+	if (
+		! $request instanceof \WP_REST_Request
+		|| false === strpos( $request->get_route(), '/wc/store/v1/checkout' )
+		|| ! funkycommerce_is_digital_store_api_checkout()
+	) {
+		return $response;
+	}
+
+	foreach ( array( 'billing_address', 'shipping_address' ) as $address_param ) {
+		$address = $request->get_param( $address_param );
+		if ( ! is_array( $address ) ) {
+			continue;
+		}
+
+		$address['address_1'] = 'Digital delivery';
+		$address['city']      = 'Digital order';
+		$address['state']     = 'Digital order';
+		$address['postcode']  = '00000';
+		$request->set_param( $address_param, $address );
+	}
+
+	return $response;
+}
+add_filter( 'rest_request_before_callbacks', 'funkycommerce_normalize_digital_checkout_request_addresses', 20, 3 );
 
 /**
  * Read the selected currency before WooCommerce validates the requested gateway.
