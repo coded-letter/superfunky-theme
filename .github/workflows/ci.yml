@@ -1,0 +1,55 @@
+name: WordPress theme CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262c # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.1"
+          coverage: none
+      - name: Reject symbolic links
+        run: test -z "$(find . -type l -not -path './.git/*' -print -quit)"
+      - name: Install theme build dependencies
+        run: npm ci
+      - name: Build native theme assets
+        run: npm run build
+      - name: Verify committed assets are reproducible
+        run: git diff --exit-code
+      - name: Parse all theme PHP
+        run: npm run lint:php
+      - name: Prepare the WordPress.org package
+        run: node scripts/prepare-wordpress-org-package.mjs --out "$RUNNER_TEMP/wordpress-org/funkycommerce-headless"
+      - name: Validate packaged PHP syntax
+        run: find "$RUNNER_TEMP/wordpress-org/funkycommerce-headless" -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+  wordpress-org-preflight:
+    if: vars.WPORG_PREFLIGHT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262c # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Prepare the WordPress.org package
+        run: node scripts/prepare-wordpress-org-package.mjs --out "$RUNNER_TEMP/wordpress-org/funkycommerce-headless"
+      - name: Run the WordPress Theme Review checks
+        uses: WordPress/theme-review-action@84400b232998116c9d1651502575c60262cceef9
+        with:
+          root-folder: ${{ runner.temp }}/wordpress-org/funkycommerce-headless
+          accessible-ready: false
+          ui-debug: false

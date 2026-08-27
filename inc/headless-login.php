@@ -140,6 +140,38 @@ function funkycommerce_register_authenticated_viewer_field() {
 			},
 		)
 	);
+	register_graphql_field(
+		'User',
+		'storefrontCapabilities',
+		array(
+			'type'    => array( 'non_null' => array( 'list_of' => array( 'non_null' => 'String' ) ) ),
+			'resolve' => function ( $user ) {
+				$viewer_id = funkycommerce_graphql_login_user_id();
+				$user_id   = is_object( $user ) && isset( $user->databaseId )
+					? absint( $user->databaseId )
+					: ( is_object( $user ) && isset( $user->ID ) ? absint( $user->ID ) : 0 );
+				if ( ! $viewer_id || $viewer_id !== $user_id ) {
+					return array();
+				}
+
+				$capabilities = array(
+					'manage_options',
+					'publish_community_posts',
+					'publish_marketplace_products',
+					'publish_collaborator_posts',
+				);
+				if ( user_can( $viewer_id, 'manage_options' ) ) {
+					return $capabilities;
+				}
+				return array_values(
+					array_filter(
+						$capabilities,
+						static fn( $capability ) => user_can( $viewer_id, $capability )
+					)
+				);
+			},
+		)
+	);
 }
 add_action( 'graphql_register_types', 'funkycommerce_register_authenticated_viewer_field' );
 

@@ -140,7 +140,7 @@ function funkycommerce_register_crypto_gateway() {
 	class WC_Gateway_FunkyCommerce_Crypto extends WC_Payment_Gateway {
 		public function __construct() {
 			$this->id                 = 'funkycommerce_crypto';
-			$this->method_title       = __( 'FunkyCommerce Crypto Wallet', 'funkycommerce-headless' );
+			$this->method_title       = __( 'Superfunky Crypto Wallet', 'funkycommerce-headless' );
 			$this->method_description = __( 'Accept direct BTC and ETH wallet transfers. Orders remain on hold until the transfer is verified.', 'funkycommerce-headless' );
 			$this->has_fields         = true;
 			$this->supports           = array( 'products' );

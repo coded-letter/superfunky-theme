@@ -27,6 +27,223 @@ function funkycommerce_security_enabled( $key, $default = 'no' ) {
 }
 
 /**
+ * Allow SVG media only when the sanitizer-backed control is enabled.
+ */
+function funkycommerce_security_upload_mimes( $mimes ) {
+	if ( funkycommerce_security_enabled( 'svg_upload_enabled' ) ) {
+		$mimes['svg'] = 'image/svg+xml';
+	}
+	return $mimes;
+}
+add_filter( 'upload_mimes', 'funkycommerce_security_upload_mimes' );
+
+/**
+ * Remove active and unsupported SVG content before WordPress moves the upload.
+ */
+function funkycommerce_security_sanitize_svg( $path ) {
+	if ( ! class_exists( 'DOMDocument' ) ) {
+		return new WP_Error( 'funkycommerce_svg_dom_unavailable', __( 'SVG uploads require the PHP DOM extension.', 'funkycommerce-headless' ) );
+	}
+
+	$source = file_get_contents( $path );
+	if ( false === $source || '' === trim( $source ) ) {
+		return new WP_Error( 'funkycommerce_svg_unreadable', __( 'The SVG file could not be read.', 'funkycommerce-headless' ) );
+	}
+	if ( preg_match( '/<!DOCTYPE|<!ENTITY/i', $source ) ) {
+		return new WP_Error( 'funkycommerce_svg_entities', __( 'SVG files containing document types or entities are not allowed.', 'funkycommerce-headless' ) );
+	}
+
+	$previous_errors = libxml_use_internal_errors( true );
+	$document        = new DOMDocument();
+	$loaded          = $document->loadXML( $source, LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_COMPACT );
+	libxml_clear_errors();
+	libxml_use_internal_errors( $previous_errors );
+	if ( ! $loaded || ! $document->documentElement || 'svg' !== strtolower( $document->documentElement->localName ) ) {
+		return new WP_Error( 'funkycommerce_svg_invalid', __( 'The uploaded file is not valid SVG markup.', 'funkycommerce-headless' ) );
+	}
+
+	$svg_namespace = 'http://www.w3.org/2000/svg';
+	$allowed_tags  = array(
+		'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
+		'text', 'tspan', 'defs', 'lineargradient', 'radialgradient', 'stop', 'clippath',
+		'mask', 'pattern', 'title', 'desc', 'symbol', 'use',
+	);
+	$allowed_attributes = array(
+		'id', 'class', 'xmlns', 'role', 'aria-label', 'aria-labelledby', 'focusable',
+		'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'width', 'height',
+		'viewbox', 'preserveaspectratio', 'd', 'points', 'fill', 'fill-opacity', 'fill-rule',
+		'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
+		'stroke-dasharray', 'stroke-dashoffset', 'stroke-opacity', 'opacity', 'transform',
+		'gradientunits', 'gradienttransform', 'offset', 'stop-color', 'stop-opacity',
+		'clip-path', 'mask', 'patternunits', 'patterncontentunits', 'href',
+	);
+
+	$elements = array();
+	foreach ( $document->getElementsByTagName( '*' ) as $element ) {
+		$elements[] = $element;
+	}
+	foreach ( $elements as $element ) {
+		$tag       = strtolower( $element->localName );
+		$namespace = (string) $element->namespaceURI;
+		if ( ! in_array( $tag, $allowed_tags, true ) || ( '' !== $namespace && $svg_namespace !== $namespace ) ) {
+			if ( $element->parentNode ) {
+				$element->parentNode->removeChild( $element );
+			}
+			continue;
+		}
+
+		$attributes = array();
+		foreach ( $element->attributes as $attribute ) {
+			$attributes[] = $attribute;
+		}
+		foreach ( $attributes as $attribute ) {
+			$name  = strtolower( $attribute->localName ?: $attribute->name );
+			$value = trim( $attribute->value );
+			$unsafe_url = preg_match( '#(?:javascript:|data:|https?:|//)#i', $value );
+			$unsafe_reference = false !== stripos( $value, 'url(' ) && ! preg_match( '/^url\(\s*#[A-Za-z][A-Za-z0-9_.:-]*\s*\)$/', $value );
+			$unsafe_href = 'href' === $name && ! preg_match( '/^#[A-Za-z][A-Za-z0-9_.:-]*$/', $value );
+			if ( ! in_array( $name, $allowed_attributes, true ) || 0 === strpos( $name, 'on' ) || $unsafe_url || $unsafe_reference || $unsafe_href ) {
+				$element->removeAttributeNode( $attribute );
+			}
+		}
+	}
+
+	$sanitized = $document->saveXML( $document->documentElement );
+	if ( ! is_string( $sanitized ) || false === file_put_contents( $path, $sanitized ) ) {
+		return new WP_Error( 'funkycommerce_svg_write_failed', __( 'The sanitised SVG file could not be saved.', 'funkycommerce-headless' ) );
+	}
+
+	return true;
+}
+
+function funkycommerce_security_svg_upload_prefilter( $file ) {
+	if ( ! funkycommerce_security_enabled( 'svg_upload_enabled' ) ) {
+		return $file;
+	}
+
+	$extension = strtolower( pathinfo( (string) ( $file['name'] ?? '' ), PATHINFO_EXTENSION ) );
+	if ( 'svg' !== $extension ) {
+		return $file;
+	}
+
+	$result = funkycommerce_security_sanitize_svg( (string) ( $file['tmp_name'] ?? '' ) );
+	if ( is_wp_error( $result ) ) {
+		$file['error'] = $result->get_error_message();
+	}
+	return $file;
+}
+add_filter( 'wp_handle_upload_prefilter', 'funkycommerce_security_svg_upload_prefilter' );
+add_filter( 'wp_handle_sideload_prefilter', 'funkycommerce_security_svg_upload_prefilter' );
+
+function funkycommerce_security_svg_filetype( $data, $file, $filename ) {
+	if ( funkycommerce_security_enabled( 'svg_upload_enabled' ) && 'svg' === strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) ) ) {
+		$data['ext']  = 'svg';
+		$data['type'] = 'image/svg+xml';
+	}
+	return $data;
+}
+add_filter( 'wp_check_filetype_and_ext', 'funkycommerce_security_svg_filetype', 10, 3 );
+
+/**
+ * Resolve whether editor scripts are enabled for one supported post type.
+ */
+function funkycommerce_security_content_scripts_allowed( $post_type ) {
+	$settings = funkycommerce_security_settings();
+	$setting_by_post_type = array(
+		'post'    => 'content_scripts_posts_enabled',
+		'page'    => 'content_scripts_pages_enabled',
+		'product' => 'content_scripts_products_enabled',
+	);
+	if ( ! isset( $setting_by_post_type[ $post_type ] ) ) {
+		return false;
+	}
+
+	return 'yes' === ( $settings[ $setting_by_post_type[ $post_type ] ] ?? 'no' );
+}
+
+/**
+ * Resolve the post type currently being saved through wp-admin or a REST endpoint.
+ */
+function funkycommerce_security_requested_post_type() {
+	if ( isset( $_POST['post_type'] ) && is_scalar( $_POST['post_type'] ) ) {
+		return sanitize_key( wp_unslash( $_POST['post_type'] ) );
+	}
+	if ( isset( $_POST['post_ID'] ) && is_scalar( $_POST['post_ID'] ) ) {
+		$post_type = get_post_type( absint( $_POST['post_ID'] ) );
+		if ( $post_type ) {
+			return $post_type;
+		}
+	}
+
+	$request_uri = rawurldecode( (string) wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) );
+	$rest_route  = '';
+	if ( isset( $GLOBALS['wp']->query_vars['rest_route'] ) && is_string( $GLOBALS['wp']->query_vars['rest_route'] ) ) {
+		$rest_route = $GLOBALS['wp']->query_vars['rest_route'];
+	} elseif ( preg_match( '#/' . preg_quote( rest_get_url_prefix(), '#' ) . '(/[^?]*)#', $request_uri, $matches ) ) {
+		$rest_route = $matches[1];
+	}
+
+	foreach ( array( 'post', 'product', 'page' ) as $post_type ) {
+		$post_type_object = get_post_type_object( $post_type );
+		if ( ! $post_type_object || ! $post_type_object->show_in_rest ) {
+			continue;
+		}
+		$namespace = $post_type_object->rest_namespace ?: 'wp/v2';
+		$rest_base = $post_type_object->rest_base ?: $post_type;
+		if ( preg_match( '#^/' . preg_quote( $namespace . '/' . $rest_base, '#' ) . '(?:/|$)#', $rest_route ) ) {
+			return $post_type;
+		}
+	}
+	return '';
+}
+
+/**
+ * Keep trusted Custom HTML scripts during saves for the selected content scope.
+ */
+function funkycommerce_security_content_script_tags( $tags, $context ) {
+	if ( 'post' !== $context || ! funkycommerce_security_content_scripts_allowed( funkycommerce_security_requested_post_type() ) ) {
+		return $tags;
+	}
+
+	$tags['script'] = array(
+		'async'              => true,
+		'class'              => true,
+		'crossorigin'        => true,
+		'data-*'             => true,
+		'defer'              => true,
+		'id'                 => true,
+		'integrity'          => true,
+		'nomodule'           => true,
+		'nonce'              => true,
+		'referrerpolicy'     => true,
+		'src'                => true,
+		'type'               => true,
+		'data-wp-block-html' => true,
+	);
+	return $tags;
+}
+add_filter( 'wp_kses_allowed_html', 'funkycommerce_security_content_script_tags', 10, 2 );
+
+/**
+ * Mark allowed CMS scripts for the storefront's explicit script executor.
+ */
+function funkycommerce_security_mark_content_scripts( $content, $post_type = '' ) {
+	$post_type = $post_type ? sanitize_key( $post_type ) : get_post_type();
+	if ( ! funkycommerce_security_content_scripts_allowed( $post_type ) || false === stripos( $content, '<script' ) ) {
+		return $content;
+	}
+
+	$marked = preg_replace(
+		'/<script\b(?![^>]*\bdata-wp-block-html\s*=)([^>]*)>/i',
+		'<script data-wp-block-html="js"$1>',
+		$content
+	);
+	return is_string( $marked ) ? $marked : $content;
+}
+add_filter( 'the_content', 'funkycommerce_security_mark_content_scripts', 99 );
+add_filter( 'woocommerce_short_description', 'funkycommerce_security_mark_content_scripts', 99 );
+
+/**
  * Detect HTTPS directly or through the first trusted proxy protocol value.
  */
 function funkycommerce_security_request_is_https() {
@@ -47,7 +264,7 @@ function funkycommerce_security_forbidden() {
 	);
 }
 
-$funkycommerce_security_boot_settings = funkycommerce_security_settings();
+$funkycommerce_security_boot_settings = (array) get_option( 'funkycommerce_control_center', array() );
 if ( ! defined( 'DISALLOW_FILE_EDIT' ) && 'yes' === ( $funkycommerce_security_boot_settings['security_disallow_file_edit'] ?? 'yes' ) ) {
 	define( 'DISALLOW_FILE_EDIT', true );
 }

@@ -1,0 +1,14 @@
+{
+  "productId": "funkycommerce-headless",
+  "repository": "coded-letter/superfunky-theme",
+  "source": "coded-letter/coded-letter-monorepo@0aebd69d9cf0616630e4f090c3e4579abe17c63d",
+  "sourcePath": "workspace/backend/wordpress/themes/free/funkycommerce-headless",
+  "installSlug": "funkycommerce-headless",
+  "kind": "theme",
+  "versionFile": "style.css",
+  "wordpressOrg": {
+    "deploySupported": false,
+    "slug": "funkycommerce-headless",
+    "status": "blocked-theme-plugin-territory"
+  }
+}
