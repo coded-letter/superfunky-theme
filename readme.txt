@@ -1,8 +1,86 @@
-=== FunkyCommerce Headless ===
+=== Superfunky Headless ===
+Contributors: coded-letter
+Tags: headless, woocommerce, wpgraphql, full-site-editing
+Requires at least: 6.7
+Tested up to: 6.8
+Requires PHP: 7.4
+Stable tag: 1.2.6
+License: GPL-2.0-or-later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 This block theme is the WordPress control plane for the FunkyCommerce storefront.
-Its frontend templates are intentionally minimal because customer-facing output is
-rendered by the separate headless application.
+By default it renders a minimal, headless-only shell because customer-facing output is
+served by the separate headless application. When headless mode is disabled in the
+Control Center, the theme also ships a complete native WordPress rendering path (see
+"Native frontend theme" below) with accessible header/footer/navigation templates and
+core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.6 highlights ==
+
+* Adds a Control Center option for horizontally scrollable empty-cart recommendations
+  containing either the first or all featured WooCommerce products.
+* Keeps empty-cart recommendations consistent across drawer and dropdown cart layouts.
+* Preserves canonical product links and requires a concrete priced variation before
+  adding variable products from empty-cart recommendations.
+
+== 1.2.5 highlights ==
+
+* Restores backend-featured WooCommerce products in the enabled empty-cart promotion.
+* Keeps hero background media full-frame and centered on mobile layouts.
+* Expands the editable storefront UI-string contract across customer-facing controls,
+  filters, dialogs, downloads, account, community, wishlist, and reading-list surfaces.
+
+== 1.2.4 highlights ==
+
+* Keeps backend UI-string overrides isolated per language, with English fallback and
+  explicit admin values taking precedence over bundled and Polylang translations.
+* Improves dynamic storefront media loading by limiting eager requests and avoiding
+  hidden adjacent community-card image preloads.
+
+== 1.2.3 highlights ==
+
+* Makes the community-members role attribute an exact comma-separated whitelist
+  of registered WordPress role slugs or labels and excludes roleless profiles.
+
+== 1.2.2 highlights ==
+
+* Makes Stripe BLIK available when shoppers select PLN in the storefront, while keeping
+  presentation backend-controlled and persisting BLIK orders with PLN-denominated totals.
+* Proxies externally hosted digital files through WooCommerce's signed download handler,
+  with per-order/file/IP rate limiting and headless storefront download support.
+
+== 1.2.1 highlights ==
+
+* Adds editable 404 page content for native and headless not-found routes, with
+  Polylang translation resolution and compatibility for both 404 and 4o4 slugs.
+
+== 1.2.0 highlights ==
+
+* Adds backend-controlled guest, optional-account, and required-account checkout modes,
+  including automatic login recovery and password-setting email for checkout-created users.
+* Keeps completed digital order downloads available through the secure seven-day order-key
+  window even when WooCommerce attached a customer during checkout.
+* Adds distraction-free checkout navigation, Home-only empty-menu fallbacks, printable PDF
+  receipts, and dismissible recent-order notifications with configurable link targets.
+
+== 1.1.20 highlights ==
+
+* Adds the editor-ready [video-hero] module with direct MP4/WebM, YouTube, and Vimeo
+  sources; poster fallback; overlays; text and CTA pills; accessible playback and
+  mute controls; reduced-motion handling; and matching headless/native rendering.
+* Adds a Video hero/banner block to the WordPress editor and a rendered example to
+  the storefront shortcode library.
+* Restores [chat_assistant] in headless page content while preserving the paid
+  plugin's native WordPress renderer.
+* Loads the inline headless assistant as a separate, lightweight frontend chunk only
+  when [chat_assistant] is present. Pages without it make no shortcode assistant
+  configuration or chat requests.
+* Includes the latest atomic multilingual route and language-switch behavior from
+  the synchronized storefront release line.
+
+The WordPress theme ZIP and the headless storefront are separate deployment
+artifacts. Theme updates install backend contracts, editor integrations, and native
+renderers; headless React changes require a storefront rebuild and deployment.
 
 == Headless account URLs ==
 
@@ -48,6 +126,11 @@ Linked multilingual page translations are selected by their database identity, s
 translated front pages remain distinct even when a translation plugin reports the same
 public URI for more than one language.
 
+Not-found routes use the published 404 page, or the WordPress-safe 4o4 alias, as their
+editable content source. When Polylang is active, the frontend and native theme resolve
+the translation linked to the language of the missing route. If no matching page or
+translation is published, the built-in 404 content remains available.
+
 Rendered page content also receives WordPress' block-library styles, merged block-theme
 global CSS, and Additional CSS. The `themeStyles` field on Page (and the
 `funkycommerceThemeStyles` root field) exposes typed color, gradient, font-family,
@@ -60,6 +143,53 @@ The block theme includes dedicated Single Post and Author Archive templates for 
 WordPress previews. Multilingual post records retain their WPGraphQL language and
 translation identities; author archives use the selected language to filter their post
 query, including explicit `?lang=en` and `?lang=pl` preview links.
+
+== Native frontend theme ==
+
+The theme owns a dedicated build pipeline for its native, non-headless rendering path
+(template HTML/PHP, template parts, and frontend assets) that is entirely independent of
+the Control Center's PHP contracts:
+
+* `package.json` / `tailwind.config.js` / `postcss.config.js`: a Tailwind CSS v3 build
+  scoped to this theme (content-scanned over `templates/`, `parts/`, and `assets/js/`,
+  with Tailwind's Preflight reset disabled so it coexists with WordPress core and plugin
+  CSS). Run `npm install` once, then `npm run build` to compile
+  `assets/css/theme-source.css` and `assets/js/theme.js` into `assets/dist/theme.css` /
+  `assets/dist/theme.js`, and to inline both compiled files into
+  `parts/header.html` / `parts/footer.html` (see `build/sync-template-assets.mjs`).
+  `npm run watch:css` re-compiles CSS on change during development. `npm run lint:php`
+  checks the syntax of PHP files this theme package owns (currently
+  `inc/frontend-theme.php`) using the `php-parser` npm package, since a native `php -l`
+  binary is not guaranteed to be available in every environment this theme is built in.
+* Because the compiled CSS/JS are inlined directly into the header/footer template
+  parts, the native shell (sticky/collapsible announcement header, accessible primary
+  navigation, dark-mode toggle, crystal-style loading overlay, footer newsletter panel,
+  and lazy-loaded Spotify slot) works immediately with zero additional PHP wiring.
+* `inc/frontend-theme.php` is an optional, self-contained upgrade path that is **not**
+  currently loaded by `functions.php`. It idiomatically `wp_enqueue_style`/
+  `wp_enqueue_script`s the same compiled files (so browsers can cache them separately
+  from inline page HTML), mirrors Control Center loader/Spotify settings to the frontend
+  script via `wp_localize_script()` when `funkycommerce_storefront_control_settings()` is
+  available, and reflects a configured Spotify playlist embed URL into the static footer
+  markup via a `render_block` filter. To activate it, add one line to `functions.php`:
+  `require_once get_template_directory() . '/inc/frontend-theme.php';`. The theme is
+  fully functional and styled without this line; it only upgrades asset delivery and
+  wires dynamic Control Center settings once added.
+* `theme.json` exposes `settings.custom.fc.*` tokens (radius, loader size/duration/
+  glow-color/glow-opacity) as `--wp--custom--fc--*` CSS custom properties, matching the
+  Control Center schema's `loading` section defaults, so the loader looks correct even
+  before `inc/frontend-theme.php` is wired in. `style.css` `@import`s the same compiled
+  stylesheet consumed by the existing `add_editor_style( 'style.css' )` call, giving the
+  block editor canvas and the public front end visual parity from one CSS source.
+* The header's primary navigation uses a `core/navigation` block with no `ref`, relying
+  on WordPress's classic-menu-fallback (a "Header Menu" location menu is promoted to a
+  `wp_navigation` post on first render). The footer's link columns are static, editable
+  block content instead, to avoid ambiguity between the header/footer/mobile classic
+  menu locations resolving to the same fallback menu.
+* The Spotify slot (`[data-funky-spotify-slot]` in `parts/footer.html`) stays hidden
+  with a placeholder until a playlist URL is configured; `assets/js/theme.js` lazily
+  mounts the embed iframe via `IntersectionObserver` once an embed URL is present
+  (either injected by `inc/frontend-theme.php`, or hand-edited into the template part).
 
 == Control Center ==
 
@@ -90,6 +220,19 @@ Authentication settings are owned by the auth plugin. The deployment frontend UR
 remains under Build & Deploy because password-reset links and redirects need it.
 Header and footer menu assignment remains in WordPress' native menu locations.
 
+== Admin theme sync ==
+
+The free theme automatically applies the active Site Editor Global Styles to wp-admin
+and the post editor. The selected background, text, link/accent, button, and heading
+colours theme the admin shell and core controls. Selected body, heading, and button font
+families are applied as well, including locally installed WordPress Font Library faces.
+Changes made under Appearance > Editor > Styles are reflected on the next admin page
+load and require no separate setting or paid companion. Theme styling loads after the
+user profile colour scheme through WordPress's core admin colour handle. Screen Options
+remain available, and hidden Quick/Bulk Edit templates stay closed until WordPress clones
+them into the active list table. Boot-time security constants read their saved raw values
+without loading the translated Control Center schema before WordPress theme setup.
+
 The Runtime coverage tab distinguishes controls consumed by current runtime code from
 controls that are safely stored but still awaiting implementation.
 
@@ -98,8 +241,9 @@ controls that are safely stored but still awaiting implementation.
 WordPress remains the canonical publication source for RSS 2.0, Atom, XML sitemaps, and
 robots.txt. The theme adds `/feed.xml`, `/rss.xml`, and `/atom.xml` aliases, maps public
 content URLs to the configured headless frontend, and publishes WooCommerce products as
-Google Merchant-compatible RSS at `/product.feed.xml`, `/product-feed.xml`, and
-`/feed/products/`.
+Google Merchant-compatible RSS at `/product-feed.xml` and `/feed/products/`.
+Atom metadata uses the public storefront URL for its site, self, author, and entry
+identifiers so the mirrored `/atom.xml` document remains valid for feed readers.
 
 The merchant feed includes stable ID, title, description, frontend product URL, image,
 availability, condition, currency-aware price, brand, and SKU/MPN where available. It is
@@ -109,6 +253,8 @@ Enabled `llms.txt`, `llms-full.txt`, brand voice, product JSON-LD, ranking signa
 conversational FAQ settings are published as real root documents. The storefront build
 mirrors these optional files plus robots.txt, all sitemap pages, RSS, Atom, and merchant
 feeds into static output whenever `VITE_GRAPHQL_ENDPOINT` is configured.
+The Apple Pay field accepts the complete domain-association document, not only a
+Merchant ID, and the storefront publishes it unchanged at the required well-known path.
 
 == Submission inboxes ==
 

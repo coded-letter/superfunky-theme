@@ -32,6 +32,11 @@ function funkycommerce_polylang_taxonomies( $taxonomies, $is_settings ) {
 	if ( funkycommerce_content_language_settings()['communityMultilingual'] ) {
 		$taxonomies['community_tag'] = 'community_tag';
 	}
+	// Polylang resolves this allowlist before WooCommerce registers its taxonomies.
+	if ( funkycommerce_has_woocommerce() ) {
+		$taxonomies['product_tag'] = 'product_tag';
+		$taxonomies['product_brand'] = 'product_brand';
+	}
 	return $taxonomies;
 }
 add_filter( 'pll_get_taxonomies', 'funkycommerce_polylang_taxonomies', 10, 2 );
@@ -89,6 +94,7 @@ function funkycommerce_assign_term_language( $term_id, $language = '' ) {
 
 function funkycommerce_set_multilingual_terms( $post_id, $names, $taxonomy, $language = '' ) {
 	$language = funkycommerce_normalize_content_language( $language );
+	$polylang_active = function_exists( 'pll_get_term_language' );
 	$term_ids = array();
 	foreach ( array_values( array_filter( array_map( 'sanitize_text_field', (array) $names ) ) ) as $name ) {
 		$matches = get_terms(
@@ -103,8 +109,8 @@ function funkycommerce_set_multilingual_terms( $post_id, $names, $taxonomy, $lan
 		}
 		$term_id = 0;
 		foreach ( $matches as $match ) {
-			$term_language = function_exists( 'pll_get_term_language' ) ? pll_get_term_language( $match->term_id, 'slug' ) : '';
-			if ( ! $term_language || $language === $term_language ) {
+			$term_language = $polylang_active ? sanitize_key( (string) pll_get_term_language( $match->term_id, 'slug' ) ) : '';
+			if ( ( $polylang_active && $language === $term_language ) || ! $polylang_active ) {
 				$term_id = (int) $match->term_id;
 				break;
 			}
@@ -125,6 +131,70 @@ function funkycommerce_set_multilingual_terms( $post_id, $names, $taxonomy, $lan
 	}
 	return wp_set_object_terms( $post_id, $term_ids, $taxonomy, false );
 }
+
+function funkycommerce_backfill_product_brand_languages() {
+	if (
+		(int) get_option( 'funkycommerce_product_brand_language_version', 0 ) >= 1
+		|| ! taxonomy_exists( 'product_brand' )
+		|| ! function_exists( 'pll_get_term_language' )
+		|| ! function_exists( 'pll_set_term_language' )
+	) {
+		return;
+	}
+
+	$language = funkycommerce_default_content_language();
+	if ( ! $language ) {
+		return;
+	}
+	$terms = get_terms(
+		array(
+			'taxonomy'   => 'product_brand',
+			'hide_empty' => false,
+		)
+	);
+	if ( is_wp_error( $terms ) ) {
+		return;
+	}
+	foreach ( $terms as $term ) {
+		if ( ! pll_get_term_language( $term->term_id, 'slug' ) ) {
+			funkycommerce_assign_term_language( $term->term_id, $language );
+		}
+	}
+	update_option( 'funkycommerce_product_brand_language_version', 1, false );
+}
+add_action( 'init', 'funkycommerce_backfill_product_brand_languages', 30 );
+
+function funkycommerce_backfill_product_tag_languages() {
+	if (
+		(int) get_option( 'funkycommerce_product_tag_language_version', 0 ) >= 1
+		|| ! taxonomy_exists( 'product_tag' )
+		|| ! function_exists( 'pll_get_term_language' )
+		|| ! function_exists( 'pll_set_term_language' )
+	) {
+		return;
+	}
+
+	$language = funkycommerce_default_content_language();
+	if ( ! $language ) {
+		return;
+	}
+	$terms = get_terms(
+		array(
+			'taxonomy'   => 'product_tag',
+			'hide_empty' => false,
+		)
+	);
+	if ( is_wp_error( $terms ) ) {
+		return;
+	}
+	foreach ( $terms as $term ) {
+		if ( ! pll_get_term_language( $term->term_id, 'slug' ) ) {
+			funkycommerce_assign_term_language( $term->term_id, $language );
+		}
+	}
+	update_option( 'funkycommerce_product_tag_language_version', 1, false );
+}
+add_action( 'init', 'funkycommerce_backfill_product_tag_languages', 30 );
 
 function funkycommerce_post_language_slug( $post_id ) {
 	if ( function_exists( 'pll_get_post_language' ) ) {
@@ -254,6 +324,32 @@ function funkycommerce_register_multilingual_graphql() {
 		)
 	);
 	register_graphql_field(
+		'CommunityPost',
+		'funkycommerceTranslations',
+		array(
+			'type'    => array( 'list_of' => 'CommunityPost' ),
+			'resolve' => function ( $source ) {
+				$post_id = funkycommerce_community_source_id( $source );
+				if ( ! $post_id || ! function_exists( 'pll_get_post_translations' ) ) {
+					return array();
+				}
+
+				$translations = array();
+				foreach ( pll_get_post_translations( $post_id ) as $translated_id ) {
+					$translated_id = absint( $translated_id );
+					if ( ! $translated_id || $translated_id === $post_id ) {
+						continue;
+					}
+					$translated_post = get_post( $translated_id );
+					if ( $translated_post instanceof WP_Post && 'community_post' === $translated_post->post_type && 'publish' === $translated_post->post_status ) {
+						$translations[] = $translated_post;
+					}
+				}
+				return $translations;
+			},
+		)
+	);
+	register_graphql_field(
 		'Comment',
 		'funkycommerceLanguage',
 		array(
@@ -264,21 +360,21 @@ function funkycommerce_register_multilingual_graphql() {
 		)
 	);
 
-	if ( funkycommerce_has_woocommerce_graphql() ) {
+	if ( funkycommerce_has_woocommerce_graphql() && ! funkycommerce_wpgraphql_polylang_is_active() ) {
 		// Register fallbacks when the WooCommerce multilingual bridge is absent.
 		try {
 		register_graphql_field(
 			'Product',
 			'language',
 			array(
-				'type'    => 'ContentLanguage',
+				'type'    => 'FunkyCommerceContentLanguage',
 				'resolve' => function ( $source ) {
 					$product_id = isset( $source->databaseId ) ? (int) $source->databaseId : 0;
 					if ( ! $product_id || ! function_exists( 'pll_get_post_language' ) ) {
 						return null;
 					}
 					$slug = sanitize_key( (string) pll_get_post_language( $product_id, 'slug' ) );
-					return $slug ? array( 'code' => strtoupper( $slug ) ) : null;
+					return $slug ? funkycommerce_language_data( $slug ) : null;
 				},
 			)
 		);

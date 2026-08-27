@@ -1,0 +1,160 @@
+name: Publish WordPress theme
+
+on:
+  workflow_run:
+    workflows: ["WordPress theme CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-wordpress-theme
+  cancel-in-progress: false
+
+env:
+  PACKAGE_SLUG: funkycommerce-headless
+  VERSION_FILE: style.css
+  WPORG_SLUG: funkycommerce-headless
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      archive: ${{ steps.package.outputs.archive }}
+      publish: ${{ steps.package.outputs.publish }}
+      source-sha: ${{ steps.source.outputs.sha }}
+      version: ${{ steps.package.outputs.version }}
+      wordpress-org-archive: ${{ steps.package.outputs.wordpress-org-archive }}
+    steps:
+      - id: source
+        name: Resolve the validated source commit
+        env:
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          sha="${VALIDATED_SHA:-$GITHUB_SHA}"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262c # v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - id: package
+        name: Build the release archive
+        run: |
+          version="$(grep -m1 -E '^Version:' "$VERSION_FILE" | sed -E 's/^[^:]+:[[:space:]]*//')"
+          stable="$(grep -m1 -E '^Stable tag:' readme.txt | sed -E 's/^[^:]+:[[:space:]]*//')"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Invalid package version: $version"
+            exit 1
+          fi
+          if [ "$version" != "$stable" ]; then
+            echo "::error::Version $version does not match readme Stable tag $stable."
+            exit 1
+          fi
+          archive="$PACKAGE_SLUG-$version.zip"
+          wordpress_org_archive="$PACKAGE_SLUG-$version-wordpress-org.zip"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          public_stage="$RUNNER_TEMP/public-package/$PACKAGE_SLUG"
+          mkdir -p "$public_stage"
+          rsync -a ./ "$public_stage/" \
+            --exclude '.git*' \
+            --exclude '.github' \
+            --exclude '.monorepo-source.json' \
+            --exclude '.wordpress-org' \
+            --exclude 'CODE_OF_CONDUCT.md' \
+            --exclude 'CONTRIBUTING.md' \
+            --exclude 'EXTRACTION_STATUS.md' \
+            --exclude 'README.md' \
+            --exclude 'SECURITY.md' \
+            --exclude 'docs' \
+            --exclude 'scripts'
+          stage="$RUNNER_TEMP/package/$PACKAGE_SLUG"
+          node scripts/prepare-wordpress-org-package.mjs --out "$stage"
+          if find "$stage" -type l -print -quit | grep -q .; then
+            echo "::error::Release packages must not contain symbolic links."
+            exit 1
+          fi
+          (cd "$(dirname "$public_stage")" && zip -X -q -r "$GITHUB_WORKSPACE/$archive" "$PACKAGE_SLUG")
+          (cd "$(dirname "$stage")" && zip -X -q -r "$GITHUB_WORKSPACE/$wordpress_org_archive" "$PACKAGE_SLUG")
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "wordpress-org-archive=$wordpress_org_archive" >> "$GITHUB_OUTPUT"
+      - name: Publish the GitHub release
+        if: steps.package.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            "${{ steps.package.outputs.archive }}" \
+            "${{ steps.package.outputs.wordpress-org-archive }}" \
+            --target "$SOURCE_SHA" \
+            --title "$PACKAGE_SLUG $VERSION" \
+            --generate-notes
+      - name: Preserve the WordPress.org submission package
+        if: steps.package.outputs.publish == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: funkycommerce-headless-${{ steps.package.outputs.version }}
+          path: ${{ steps.package.outputs.wordpress-org-archive }}
+          if-no-files-found: error
+
+  wordpress-org:
+    if: needs.release.outputs.publish == 'true' && vars.WPORG_DEPLOY_ENABLED == 'true' && false
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: wordpress-org
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262c # v4
+        with:
+          ref: ${{ needs.release.outputs.source-sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Require WordPress.org credentials
+        env:
+          WPORG_SVN_PASSWORD: ${{ secrets.WPORG_SVN_PASSWORD }}
+          WPORG_USERNAME: ${{ secrets.WPORG_USERNAME }}
+        run: |
+          test -n "$WPORG_USERNAME" || { echo "::error::Missing WPORG_USERNAME."; exit 1; }
+          test -n "$WPORG_SVN_PASSWORD" || { echo "::error::Missing WPORG_SVN_PASSWORD."; exit 1; }
+      - name: Deploy the approved theme release to WordPress.org
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          WPORG_SVN_PASSWORD: ${{ secrets.WPORG_SVN_PASSWORD }}
+          WPORG_USERNAME: ${{ secrets.WPORG_USERNAME }}
+        run: |
+          svn_root="$RUNNER_TEMP/wordpress-org"
+          stage="$RUNNER_TEMP/package/$PACKAGE_SLUG"
+          node scripts/prepare-wordpress-org-package.mjs --out "$stage"
+          svn checkout "https://themes.svn.wordpress.org/$WPORG_SLUG" "$svn_root"
+          if svn info "https://themes.svn.wordpress.org/$WPORG_SLUG/$VERSION" >/dev/null 2>&1; then
+            echo "::error::WordPress.org version $VERSION already exists and cannot be overwritten."
+            exit 1
+          fi
+          mkdir "$svn_root/$VERSION"
+          rsync -a "$stage/" "$svn_root/$VERSION/"
+          svn add "$svn_root/$VERSION"
+          svn commit "$svn_root" \
+            --message "Release $VERSION from GitHub commit ${{ needs.release.outputs.source-sha }}" \
+            --username "$WPORG_USERNAME" \
+            --password "$WPORG_SVN_PASSWORD" \
+            --no-auth-cache \
+            --non-interactive

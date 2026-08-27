@@ -7,6 +7,7 @@ free-tier-only code.
 | Date | Module | Status |
 |---|---|---|
 | 2025-08-03 | Full theme (v0.7.0) | ✅ Complete — all PHP files, templates, and schema published |
+| 2026-08-27 | Full theme (v1.2.6) | Complete — synchronized from `coded-letter/coded-letter-monorepo@0aebd69d9cf0616630e4f090c3e4579abe17c63d` |
 
 ## Free/Pro Tier Summary
 
@@ -32,6 +33,6 @@ When Pro is not active, `funkycommerce_is_pro()` returns `false` and:
 ## Process
 
 1. Changes are developed in the private monorepo.
-2. Free-tier code is manually extracted and reviewed.
-3. Premium plugin references and secrets are verified absent.
-4. Code is pushed to this repo with an updated status entry.
+2. The catalog-allowlisted exporter replaces the public package files.
+3. Premium implementation and secrets are verified absent before and after export.
+4. A provenance-stamped pull request is reviewed and independently validated here.

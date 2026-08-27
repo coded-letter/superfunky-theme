@@ -50,6 +50,7 @@ function funkycommerce_static_generation_config() {
 		'gtmContainerId'         => (string) ( $settings['gtm_container_id'] ?? '' ),
 		'headScripts'            => (string) ( $settings['head_scripts'] ?? '' ),
 		'bodyScripts'            => (string) ( $settings['body_scripts'] ?? '' ),
+		'footerScripts'          => (string) ( $settings['footer_scripts'] ?? '' ),
 	);
 }
 
@@ -57,6 +58,9 @@ function funkycommerce_static_generation_config() {
  * Expose public build inputs to CI without exposing privileged deployment settings.
  */
 function funkycommerce_register_static_generation_graphql() {
+	if ( ! funkycommerce_is_headless_mode() ) {
+		return;
+	}
 	register_graphql_field(
 		'RootQuery',
 		'funkycommerceStaticGenerationConfig',
@@ -75,6 +79,9 @@ add_action( 'graphql_register_types', 'funkycommerce_register_static_generation_
  * Trigger the configured deployment build hook.
  */
 function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
+	if ( ! funkycommerce_is_headless_mode() ) {
+		return;
+	}
 	$settings    = funkycommerce_control_center_settings();
 	$webhook_url = $settings['build_webhook_url'] ?? '';
 
@@ -100,12 +107,32 @@ function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
 
 	if ( is_wp_error( $response ) ) {
 		error_log( 'FunkyCommerce storefront build webhook failed: ' . $response->get_error_message() );
+		funkycommerce_emit_notification(
+			'theme.build_webhook_failed',
+			__( 'Storefront build webhook failed', 'funkycommerce-headless' ),
+			__( 'The configured storefront build service could not be reached.', 'funkycommerce-headless' ),
+			array(
+				__( 'Reason', 'funkycommerce-headless' ) => sanitize_key( $reason ),
+				__( 'Error', 'funkycommerce-headless' )  => $response->get_error_code(),
+			),
+			admin_url( 'themes.php?page=funkycommerce-control-center' )
+		);
 		return;
 	}
 
 	$status = wp_remote_retrieve_response_code( $response );
 	if ( $status < 200 || $status >= 300 ) {
 		error_log( sprintf( 'FunkyCommerce storefront build webhook returned HTTP %d.', $status ) );
+		funkycommerce_emit_notification(
+			'theme.build_webhook_failed',
+			__( 'Storefront build webhook failed', 'funkycommerce-headless' ),
+			__( 'The configured storefront build service rejected the request.', 'funkycommerce-headless' ),
+			array(
+				__( 'Reason', 'funkycommerce-headless' )      => sanitize_key( $reason ),
+				__( 'HTTP status', 'funkycommerce-headless' ) => (int) $status,
+			),
+			admin_url( 'themes.php?page=funkycommerce-control-center' )
+		);
 	}
 }
 add_action( FUNKYCOMMERCE_BUILD_EVENT, 'funkycommerce_trigger_storefront_build' );
@@ -147,7 +174,7 @@ function funkycommerce_sync_build_schedule( $old_value = array(), $value = array
 	}
 
 	$value = is_array( $value ) ? $value : array();
-	if ( 'yes' === ( $value['periodic_rebuild'] ?? 'no' ) && ! empty( $value['build_webhook_url'] ) ) {
+	if ( 'build-webhook' === ( $value['artifact_mode'] ?? 'build-webhook' ) && 'no' !== ( $value['headless_mode'] ?? 'yes' ) && 'yes' === ( $value['periodic_rebuild'] ?? 'no' ) && ! empty( $value['build_webhook_url'] ) ) {
 		wp_schedule_event( time() + HOUR_IN_SECONDS, 'funkycommerce_rebuild_interval', FUNKYCOMMERCE_BUILD_EVENT );
 	}
 }
@@ -157,8 +184,12 @@ add_action( 'update_option_funkycommerce_control_center', 'funkycommerce_sync_bu
  * Restore a missing recurring event after theme activation or a cron reset.
  */
 function funkycommerce_ensure_build_schedule() {
+	if ( ! funkycommerce_is_headless_mode() ) {
+		return;
+	}
 	$settings = funkycommerce_control_center_settings();
 	if (
+		'build-webhook' === funkycommerce_artifact_mode() &&
 		'yes' === ( $settings['periodic_rebuild'] ?? 'no' ) &&
 		! empty( $settings['build_webhook_url'] ) &&
 		! wp_next_scheduled( FUNKYCOMMERCE_BUILD_EVENT )
@@ -172,6 +203,9 @@ add_action( 'init', 'funkycommerce_ensure_build_schedule' );
  * Debounce publishing changes into one build request.
  */
 function funkycommerce_schedule_content_build() {
+	if ( ! funkycommerce_is_headless_mode() || 'build-webhook' !== funkycommerce_artifact_mode() ) {
+		return;
+	}
 	$settings = funkycommerce_control_center_settings();
 	if ( empty( $settings['build_webhook_url'] ) || wp_next_scheduled( FUNKYCOMMERCE_BUILD_DEBOUNCE_EVENT ) ) {
 		return;
