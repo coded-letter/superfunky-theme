@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.8' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.9' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -149,9 +149,7 @@ require_once get_template_directory() . '/inc/control-center-schema.php';
 require_once get_template_directory() . '/inc/artifact-protocol.php';
 require_once get_template_directory() . '/inc/artifact-store.php';
 require_once get_template_directory() . '/inc/artifact-rest.php';
-require_once get_template_directory() . '/inc/superfunky-licence-client.php';
 require_once get_template_directory() . '/inc/superfunky-update-client.php';
-Superfunky_Licence_Client::register();
 Superfunky_Update_Client::register_product(
 	array(
 		'access'       => 'public',
