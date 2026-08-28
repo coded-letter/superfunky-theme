@@ -1096,16 +1096,37 @@ function funkycommerce_with_headless_shortcode_markers( $callback ) {
 }
 
 /**
+ * Run content filters without allowing paragraph formatting inside code tags.
+ */
+function funkycommerce_filter_headless_content( $content, $filter = 'the_content' ) {
+	$preserved = array();
+	$protected = preg_replace_callback(
+		'#<(script|style)\b[^>]*>.*?</\1\s*>#is',
+		static function ( $matches ) use ( &$preserved ) {
+			$key         = 'fc-preserved-code-' . count( $preserved );
+			$placeholder = '<div data-funkycommerce-preserved-code="' . $key . '"></div>';
+			$preserved[ $placeholder ] = $matches[0];
+			return $placeholder;
+		},
+		$content
+	);
+	$protected = is_string( $protected ) ? $protected : $content;
+	$filtered  = funkycommerce_with_headless_shortcode_markers(
+		static function () use ( $filter, $protected ) {
+			return apply_filters( $filter, $protected );
+		}
+	);
+
+	return strtr( $filtered, $preserved );
+}
+
+/**
  * Render supplemental page content while preserving application shortcode markers in place.
  */
 function funkycommerce_render_headless_page_content( $page_id ) {
 	$content = (string) get_post_field( 'post_content', $page_id );
 	$content = serialize_blocks( funkycommerce_filter_headless_blocks( parse_blocks( $content ) ) );
-	$content = funkycommerce_with_headless_shortcode_markers(
-		static function () use ( $content ) {
-			return apply_filters( 'the_content', $content );
-		}
-	);
+	$content = funkycommerce_filter_headless_content( $content );
 	$content = funkycommerce_security_mark_content_scripts( $content, 'page' );
 
 	/*
@@ -1145,11 +1166,7 @@ function funkycommerce_render_headless_content_field( $post_id, $field, $filter 
 	}
 
 	$content = (string) get_post_field( $field, $post_id );
-	$content = funkycommerce_with_headless_shortcode_markers(
-		static function () use ( $content, $filter ) {
-			return apply_filters( $filter, $content );
-		}
-	);
+	$content = funkycommerce_filter_headless_content( $content, $filter );
 	return funkycommerce_security_mark_content_scripts( $content, $post_type );
 }
 
