@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.12' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.13' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -968,44 +968,21 @@ function funkycommerce_graphql_content_database_id( $node ) {
 }
 
 /**
- * Remove blocks implemented by the React application while retaining editor content.
+ * Render content while omitting blocks implemented by the React application.
  */
-function funkycommerce_filter_headless_blocks( $blocks ) {
-	$filtered = array();
-	$mapped   = funkycommerce_headless_component_blocks();
+function funkycommerce_without_headless_component_blocks( $callback ) {
+	$mapped = funkycommerce_headless_component_blocks();
+	$filter = static function ( $block_content, $block ) use ( $mapped ) {
+		$block_name = is_array( $block ) ? ( $block['blockName'] ?? null ) : null;
+		return in_array( $block_name, $mapped, true ) ? '' : $block_content;
+	};
 
-	foreach ( $blocks as $block ) {
-		if ( in_array( $block['blockName'], $mapped, true ) ) {
-			continue;
-		}
-		if ( ! empty( $block['innerBlocks'] ) ) {
-			$inner_blocks  = array();
-			$inner_content = array();
-			$child_index   = 0;
-
-			foreach ( $block['innerContent'] as $content_part ) {
-				if ( null !== $content_part ) {
-					$inner_content[] = $content_part;
-					continue;
-				}
-
-				$child          = $block['innerBlocks'][ $child_index ] ?? null;
-				$filtered_child = $child ? funkycommerce_filter_headless_blocks( array( $child ) ) : array();
-				++$child_index;
-
-				if ( $filtered_child ) {
-					$inner_blocks[]  = $filtered_child[0];
-					$inner_content[] = null;
-				}
-			}
-
-			$block['innerBlocks']  = $inner_blocks;
-			$block['innerContent'] = $inner_content;
-		}
-		$filtered[] = $block;
+	add_filter( 'pre_render_block', $filter, PHP_INT_MAX, 2 );
+	try {
+		return call_user_func( $callback );
+	} finally {
+		remove_filter( 'pre_render_block', $filter, PHP_INT_MAX );
 	}
-
-	return $filtered;
 }
 
 /**
@@ -1174,8 +1151,11 @@ function funkycommerce_filter_headless_content( $content, $filter = 'the_content
  */
 function funkycommerce_render_headless_page_content( $page_id ) {
 	$content = (string) get_post_field( 'post_content', $page_id );
-	$content = serialize_blocks( funkycommerce_filter_headless_blocks( parse_blocks( $content ) ) );
-	$content = funkycommerce_filter_headless_content( $content );
+	$content = funkycommerce_without_headless_component_blocks(
+		static function () use ( $content ) {
+			return funkycommerce_filter_headless_content( $content );
+		}
+	);
 	$content = funkycommerce_security_mark_content_scripts( $content, 'page' );
 
 	/*
