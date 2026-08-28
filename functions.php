@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.15' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.16' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -424,6 +424,7 @@ function funkycommerce_content_shortcode_schemas() {
 			'poster'              => array( 'default' => '', 'type' => 'url' ),
 			'kicker'              => array( 'default' => '' ),
 			'title'               => array( 'default' => __( 'Video hero', 'funkycommerce-headless' ) ),
+			'heading_level'       => array( 'default' => 'h2', 'enum' => array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ) ),
 			'description'         => array( 'default' => '' ),
 			'primary_cta_label'   => array( 'default' => '' ),
 			'primary_cta_href'    => array( 'default' => '', 'type' => 'url-path' ),
@@ -917,6 +918,7 @@ function funkycommerce_register_video_hero_block() {
 			'attributes'      => array(
 				'src' => array( 'type' => 'string', 'default' => '' ), 'variant' => array( 'type' => 'string', 'default' => 'fullbleed' ), 'poster' => array( 'type' => 'string', 'default' => '' ),
 				'kicker' => array( 'type' => 'string', 'default' => '' ), 'title' => array( 'type' => 'string', 'default' => 'Video hero' ),
+				'headingLevel' => array( 'type' => 'string', 'default' => 'h2' ),
 				'description' => array( 'type' => 'string', 'default' => '' ), 'primaryCtaLabel' => array( 'type' => 'string', 'default' => '' ),
 				'primaryCtaHref' => array( 'type' => 'string', 'default' => '' ), 'secondaryCtaLabel' => array( 'type' => 'string', 'default' => '' ),
 				'secondaryCtaHref' => array( 'type' => 'string', 'default' => '' ), 'align' => array( 'type' => 'string', 'default' => 'left' ),
@@ -932,7 +934,7 @@ add_action( 'init', 'funkycommerce_register_video_hero_block', 30 );
 
 function funkycommerce_render_video_hero_block( $attributes ) {
 	$map = array(
-		'src' => 'src', 'variant' => 'variant', 'poster' => 'poster', 'kicker' => 'kicker', 'title' => 'title', 'description' => 'description',
+		'src' => 'src', 'variant' => 'variant', 'poster' => 'poster', 'kicker' => 'kicker', 'title' => 'title', 'headingLevel' => 'heading_level', 'description' => 'description',
 		'primaryCtaLabel' => 'primary_cta_label', 'primaryCtaHref' => 'primary_cta_href',
 		'secondaryCtaLabel' => 'secondary_cta_label', 'secondaryCtaHref' => 'secondary_cta_href',
 		'align' => 'align', 'height' => 'height', 'overlayOpacity' => 'overlay_opacity',

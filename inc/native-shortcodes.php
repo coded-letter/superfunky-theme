@@ -965,9 +965,10 @@ function funkycommerce_native_render_video_hero( $atts ) {
 	$ctas   = funkycommerce_native_cta_link( $a['primary_cta_label'], $a['primary_cta_href'], $a['primary_cta_target'], $a['primary_cta_rel'], 'funkycommerce-native-cta funkycommerce-native-cta--primary' );
 	$ctas  .= funkycommerce_native_cta_link( $a['secondary_cta_label'], $a['secondary_cta_href'], $a['secondary_cta_target'], $a['secondary_cta_rel'], 'funkycommerce-native-cta funkycommerce-native-cta--secondary' );
 	$height = preg_match( '/^\d+(px|vh|%)$/', $a['height'] ) ? $a['height'] : '70vh';
+	$heading_tag = in_array( $a['heading_level'], array( 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ), true ) ? $a['heading_level'] : 'h2';
 
 	return sprintf(
-		'<section class="funkycommerce-native funkycommerce-native-video-hero funkycommerce-native-video-hero--%1$s funkycommerce-native-video-hero--%17$s" style="min-height:%2$s" data-video-playing="%10$s" data-video-muted="%11$s" data-video-provider="%12$s">%3$s%4$s<div class="funkycommerce-native-video-hero-overlay" style="opacity:%5$s"></div><div class="funkycommerce-native-video-hero-content">%6$s<h2>%7$s</h2>%8$s%9$s</div><div class="funkycommerce-native-video-hero-controls"><button class="funkycommerce-native-video-hero-control funkycommerce-native-video-hero-mute" type="button" aria-label="%13$s">%14$s</button><button class="funkycommerce-native-video-hero-control funkycommerce-native-video-hero-playback" type="button" aria-label="%15$s">%16$s</button></div></section>',
+		'<section class="funkycommerce-native funkycommerce-native-video-hero funkycommerce-native-video-hero--%1$s funkycommerce-native-video-hero--%17$s" style="min-height:%2$s" data-video-playing="%10$s" data-video-muted="%11$s" data-video-provider="%12$s">%3$s%4$s<div class="funkycommerce-native-video-hero-overlay" style="opacity:%5$s"></div><div class="funkycommerce-native-video-hero-content">%6$s<%18$s>%7$s</%18$s>%8$s%9$s</div><div class="funkycommerce-native-video-hero-controls"><button class="funkycommerce-native-video-hero-control funkycommerce-native-video-hero-mute" type="button" aria-label="%13$s">%14$s</button><button class="funkycommerce-native-video-hero-control funkycommerce-native-video-hero-playback" type="button" aria-label="%15$s">%16$s</button></div></section>',
 		esc_attr( $a['align'] ),
 		esc_attr( $height ),
 		$poster,
@@ -984,7 +985,8 @@ function funkycommerce_native_render_video_hero( $atts ) {
 		$a['muted'] ? '&#128263;' : '&#128266;',
 		$starts_playing ? esc_attr__( 'Pause background video', 'funkycommerce-headless' ) : esc_attr__( 'Play background video', 'funkycommerce-headless' ),
 		$starts_playing ? '&#10074;&#10074;' : '&#9654;',
-		esc_attr( $a['variant'] )
+		esc_attr( $a['variant'] ),
+		$heading_tag
 	);
 }
 

@@ -508,7 +508,7 @@ function funkycommerce_sanitize_control_center( $input ) {
 		$output['backend_noindex_acknowledged'] = $previous['backend_noindex_acknowledged'] ?? 'no';
 	}
 
-	$languages = function_exists( 'funkycommerce_available_language_slugs' ) ? funkycommerce_available_language_slugs() : array();
+	$languages = funkycommerce_control_center_language_slugs();
 	foreach ( $languages as $language ) {
 		$tagline_key = 'store_tagline_' . $language;
 		$promo_key   = 'promo_text_' . $language;
@@ -531,6 +531,22 @@ function funkycommerce_sanitize_control_center( $input ) {
 	}
 
 	return $output;
+}
+
+/**
+ * Return Polylang languages or the site's default language for editable UI strings.
+ */
+function funkycommerce_control_center_language_slugs() {
+	$languages = function_exists( 'funkycommerce_available_language_slugs' ) ? funkycommerce_available_language_slugs() : array();
+	if ( $languages ) {
+		return $languages;
+	}
+	if ( function_exists( 'funkycommerce_site_default_language_slug' ) ) {
+		return array( funkycommerce_site_default_language_slug() );
+	}
+	$locale = (string) get_option( 'WPLANG', '' );
+	$slug   = sanitize_key( strtolower( strtok( $locale ?: 'en_US', '_-' ) ) );
+	return array( $slug ?: 'en' );
 }
 
 /**
@@ -762,6 +778,7 @@ function funkycommerce_storefront_control_settings( $language = '' ) {
 			'quietSeconds'    => max( 2, min( 300, (int) ( $settings['recent_orders_quiet_seconds'] ?? 8 ) ) ),
 			'openLinksInNewTab' => 'yes' === ( $settings['recent_orders_links_new_tab'] ?? 'yes' ),
 		),
+		'soundsEnabled' => 'yes' === ( $settings['sounds_enabled'] ?? 'no' ),
 		'loading' => array(
 			'enabled'      => 'yes' === ( $settings['loader_enabled'] ?? 'yes' ),
 			'customUrl'    => esc_url_raw( $settings['loader_custom_url'] ?? '' ),
@@ -1378,16 +1395,22 @@ function funkycommerce_render_control_center() {
 								</div>
 							<?php endif; ?>
 							<?php foreach ( $section['fields'] as $key => $field ) : funkycommerce_render_control_field( $key, $field, $settings[ $key ] ?? ( $field['default'] ?? '' ) ); endforeach; ?>
-							<?php if ( 'multilingual' === $section_key && function_exists( 'funkycommerce_available_language_slugs' ) ) : ?>
+							<?php if ( 'multilingual' === $section_key ) : ?>
 								<div class="fc-language-values">
 									<h3><?php esc_html_e( 'Language-specific storefront content', 'funkycommerce-headless' ); ?></h3>
-									<p><?php esc_html_e( 'UI strings are JSON key/value maps. Empty translated branding values fall back to the general settings.', 'funkycommerce-headless' ); ?></p>
-									<?php foreach ( funkycommerce_available_language_slugs() as $slug ) : $language = funkycommerce_language_data( $slug ); ?>
+									<p><?php esc_html_e( 'UI strings are JSON key/value maps. Without Polylang, the site default language is available here. Empty translated branding values fall back to the general settings.', 'funkycommerce-headless' ); ?></p>
+									<?php foreach ( funkycommerce_control_center_language_slugs() as $slug ) : $language = funkycommerce_language_data( $slug ); ?>
 										<details><summary><?php echo esc_html( $language['name'] ); ?></summary>
 											<?php
 											funkycommerce_render_control_field( 'store_tagline_' . $slug, array( 'label' => __( 'Store tagline', 'funkycommerce-headless' ), 'type' => 'text' ), $settings[ 'store_tagline_' . $slug ] ?? '' );
 											funkycommerce_render_control_field( 'promo_text_' . $slug, array( 'label' => __( 'Promotional message', 'funkycommerce-headless' ), 'type' => 'text' ), $settings[ 'promo_text_' . $slug ] ?? '' );
-											$ui_strings = wp_json_encode( funkycommerce_storefront_ui_strings_for_language( $slug ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+											$ui_strings = wp_json_encode(
+												array_merge(
+													funkycommerce_storefront_ui_strings_for_language( 'en' ),
+													funkycommerce_storefront_ui_strings_for_language( $slug )
+												),
+												JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+											);
 											funkycommerce_render_control_field( 'ui_strings_' . $slug, array( 'label' => __( 'Storefront UI strings', 'funkycommerce-headless' ), 'type' => 'json', 'default' => '{}' ), $ui_strings ?: '{}' );
 											?>
 										</details>
