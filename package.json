@@ -1,7 +1,7 @@
 {
   "name": "funkycommerce-headless-theme",
   "private": true,
-  "version": "1.2.13",
+  "version": "1.2.14",
   "description": "Tailwind/build tooling for the FunkyCommerce Headless WordPress theme's native frontend assets (block templates, template parts, loader, and Spotify slot).",
   "scripts": {
     "build:css": "tailwindcss -i ./assets/css/theme-source.css -o ./assets/dist/theme.css --minify",
