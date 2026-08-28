@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.9
+Stable tag: 1.2.10
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,12 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.10 highlights ==
+
+* Keeps theme settings site-local and submits each Control Center section independently on multisite hosts.
+* Preserves trusted Custom HTML script and style blocks while generating headless storefront content.
+* Validates Layout Studio imports atomically and rejects HTML responses before script execution.
 
 == 1.2.9 highlights ==
 
