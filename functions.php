@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.13' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.14' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -1100,48 +1100,14 @@ function funkycommerce_normalize_headless_style_content( $content ) {
 }
 
 /**
- * Remove paragraph wrappers that content filters add around protected code placeholders.
- */
-function funkycommerce_unwrap_headless_code_placeholders( $content ) {
-	$placeholder = '<pre data-funkycommerce-preserved-code="fc-preserved-code-\d+"></pre>';
-	$patterns    = array(
-		'#<p(?:\s[^>]*)?>\s*(' . $placeholder . ')\s*</p>#i',
-		'#<p(?:\s[^>]*)?>\s*(' . $placeholder . ')#i',
-		'#(' . $placeholder . ')\s*</p>#i',
-	);
-
-	foreach ( $patterns as $pattern ) {
-		$unwrapped = preg_replace( $pattern, '$1', $content );
-		$content   = is_string( $unwrapped ) ? $unwrapped : $content;
-	}
-
-	return $content;
-}
-
-/**
- * Run content filters without allowing paragraph formatting inside code tags.
+ * Run the native content pipeline before repairing legacy CSS formatting.
  */
 function funkycommerce_filter_headless_content( $content, $filter = 'the_content' ) {
-	$preserved = array();
-	$content   = funkycommerce_normalize_headless_style_content( $content );
-	$protected = preg_replace_callback(
-		'#<(script|style)\b[^>]*>.*?</\1\s*>#is',
-		static function ( $matches ) use ( &$preserved ) {
-			$key         = 'fc-preserved-code-' . count( $preserved );
-			$placeholder = '<pre data-funkycommerce-preserved-code="' . $key . '"></pre>';
-			$preserved[ $placeholder ] = $matches[0];
-			return $placeholder;
-		},
-		$content
-	);
-	$protected = is_string( $protected ) ? $protected : $content;
-	$filtered  = funkycommerce_with_headless_shortcode_markers(
-		static function () use ( $filter, $protected ) {
-			return apply_filters( $filter, $protected );
+	$filtered = funkycommerce_with_headless_shortcode_markers(
+		static function () use ( $filter, $content ) {
+			return apply_filters( $filter, $content );
 		}
 	);
-	$filtered = funkycommerce_unwrap_headless_code_placeholders( $filtered );
-	$filtered = strtr( $filtered, $preserved );
 
 	return funkycommerce_normalize_headless_style_content( $filtered );
 }
