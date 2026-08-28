@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.14' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.15' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -1100,7 +1100,23 @@ function funkycommerce_normalize_headless_style_content( $content ) {
 }
 
 /**
- * Run the native content pipeline before repairing legacy CSS formatting.
+ * Disable automatic paragraph formatting across WordPress-rendered content.
+ */
+function funkycommerce_disable_content_wpautop() {
+	$filters = array(
+		'the_content',
+		'the_excerpt',
+		'woocommerce_short_description',
+	);
+
+	foreach ( $filters as $filter ) {
+		remove_filter( $filter, 'wpautop' );
+	}
+}
+add_action( 'init', 'funkycommerce_disable_content_wpautop', PHP_INT_MAX );
+
+/**
+ * Run the content pipeline without automatic paragraph formatting.
  */
 function funkycommerce_filter_headless_content( $content, $filter = 'the_content' ) {
 	$filtered = funkycommerce_with_headless_shortcode_markers(
