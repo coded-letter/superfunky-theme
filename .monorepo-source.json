@@ -1,7 +1,7 @@
 {
   "productId": "funkycommerce-headless",
   "repository": "coded-letter/superfunky-theme",
-  "source": "coded-letter/coded-letter-monorepo@6c30494800292a09cfa886b0ba7fd33ff6e7624c",
+  "source": "coded-letter/coded-letter-monorepo@66fb5b9fd6e19b37cab437e2f438787f51120bee",
   "sourcePath": "workspace/backend/wordpress/themes/free/funkycommerce-headless",
   "installSlug": "funkycommerce-headless",
   "kind": "theme",
