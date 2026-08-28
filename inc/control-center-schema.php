@@ -435,7 +435,13 @@ function funkycommerce_control_center_sections() {
 			'title'       => __( 'Footer', 'funkycommerce-headless' ),
 			'description' => __( 'Footer content, social profiles, and newsletter copy. Native WordPress menus own column assignments; layout alternatives remain in Layout Studio.', 'funkycommerce-headless' ),
 			'fields'      => array(
-				'copyright_text'           => array( 'label' => __( 'Copyright text', 'funkycommerce-headless' ), 'type' => 'text', 'tier' => 'free' ),
+				'copyright_text'           => array(
+					'label'       => __( 'Copyright text', 'funkycommerce-headless' ),
+					'type'        => 'textarea',
+					'tier'        => 'free',
+					'sanitize'    => 'html',
+					'description' => __( 'Basic HTML is allowed, including links.', 'funkycommerce-headless' ),
+				),
 				'social_links'             => array( 'label' => __( 'Social profiles', 'funkycommerce-headless' ), 'type' => 'social_links', 'tier' => 'free', 'default' => array(), 'description' => __( 'Free theme feature. Add any supported platform more than once; every profile opens in a new tab.', 'funkycommerce-headless' ) ),
 				'newsletter_heading'       => array( 'label' => __( 'Newsletter heading', 'funkycommerce-headless' ), 'type' => 'text', 'tier' => 'free' ),
 				'newsletter_text'          => array( 'label' => __( 'Newsletter supporting text', 'funkycommerce-headless' ), 'type' => 'textarea', 'tier' => 'free' ),
