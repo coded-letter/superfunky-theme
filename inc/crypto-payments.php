@@ -215,7 +215,7 @@ function funkycommerce_register_crypto_gateway() {
 
 		public function payment_fields() {
 			if ( $this->description ) {
-				echo wp_kses_post( wpautop( $this->description ) );
+				echo wp_kses_post( $this->description );
 			}
 			$config = funkycommerce_crypto_gateway_settings();
 			$first_asset = array_key_first( $config['assets'] );
