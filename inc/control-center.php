@@ -389,15 +389,39 @@ function funkycommerce_sanitize_control_center( $input ) {
 	$previous = (array) get_option( 'funkycommerce_control_center', array() );
 	$output   = array();
 
-	$layout_import = trim( wp_unslash( (string) ( $input['layout_import_config'] ?? '' ) ) );
+	/*
+	 * options.php has already unslashed registered setting values before invoking
+	 * this callback. Unslashing JSON again corrupts valid escaped characters.
+	 */
+	$layout_import = trim( (string) ( $input['layout_import_config'] ?? '' ) );
 	if ( '' !== $layout_import ) {
 		$decoded = json_decode( $layout_import, true );
-		$layout  = is_array( $decoded ) && isset( $decoded['layout'] ) && is_array( $decoded['layout'] ) ? $decoded['layout'] : $decoded;
-		if ( ! is_array( $layout ) ) {
+		$layout  = is_array( $decoded ) && array_key_exists( 'layout', $decoded ) ? $decoded['layout'] : $decoded;
+		$version = is_array( $decoded ) && array_key_exists( 'schemaVersion', $decoded ) ? $decoded['schemaVersion'] : ( is_array( $layout ) ? ( $layout['schemaVersion'] ?? 1 ) : 1 );
+		$invalid = array();
+		$mapped  = array();
+
+		if ( JSON_ERROR_NONE !== json_last_error() ) {
 			add_settings_error(
 				'funkycommerce_control_center',
 				'invalid_layout_import',
-				__( 'The Layout Studio configuration was not loaded because it is not valid JSON.', 'funkycommerce-headless' )
+				sprintf(
+					/* translators: %s: JSON parser error. */
+					__( 'The Layout Studio configuration was not loaded: %s', 'funkycommerce-headless' ),
+					json_last_error_msg()
+				)
+			);
+		} elseif ( ! is_array( $layout ) ) {
+			add_settings_error(
+				'funkycommerce_control_center',
+				'invalid_layout_import',
+				__( 'The Layout Studio configuration was not loaded because the JSON root must be a layout object.', 'funkycommerce-headless' )
+			);
+		} elseif ( 1 !== $version ) {
+			add_settings_error(
+				'funkycommerce_control_center',
+				'unsupported_layout_import',
+				__( 'The Layout Studio configuration was not loaded because its schema version is unsupported.', 'funkycommerce-headless' )
 			);
 		} else {
 			foreach ( funkycommerce_layout_control_fields() as $key => $field ) {
@@ -405,14 +429,48 @@ function funkycommerce_sanitize_control_center( $input ) {
 				if ( 'readonly' === $field['type'] || '' === $graph_key || ! array_key_exists( $graph_key, $layout ) ) {
 					continue;
 				}
-				$input[ $key ] = 'toggle' === $field['type'] ? ( filter_var( $layout[ $graph_key ], FILTER_VALIDATE_BOOLEAN ) ? 'yes' : '' ) : $layout[ $graph_key ];
+
+				$value = $layout[ $graph_key ];
+				if ( 'toggle' === $field['type'] && ! is_bool( $value ) ) {
+					$invalid[] = $field['label'];
+					continue;
+				}
+				if ( 'number' === $field['type'] && ! is_numeric( $value ) ) {
+					$invalid[] = $field['label'];
+					continue;
+				}
+				if ( 'select' === $field['type'] && ( ! is_string( $value ) || ! isset( $field['options'][ $value ] ) ) ) {
+					$invalid[] = $field['label'];
+					continue;
+				}
+				$mapped[ $key ] = 'toggle' === $field['type'] ? ( $value ? 'yes' : 'no' ) : $value;
 			}
-			add_settings_error(
-				'funkycommerce_control_center',
-				'layout_import_loaded',
-				__( 'Layout Studio configuration loaded. Review the controls below and save again if you make further changes.', 'funkycommerce-headless' ),
-				'updated'
-			);
+
+			if ( $invalid ) {
+				add_settings_error(
+					'funkycommerce_control_center',
+					'invalid_layout_import_values',
+					sprintf(
+						/* translators: %s: comma-separated setting labels. */
+						__( 'The Layout Studio configuration was not loaded because these values are invalid: %s', 'funkycommerce-headless' ),
+						implode( ', ', $invalid )
+					)
+				);
+			} elseif ( ! $mapped ) {
+				add_settings_error(
+					'funkycommerce_control_center',
+					'empty_layout_import',
+					__( 'The Layout Studio configuration was not loaded because it contains no recognized layout values.', 'funkycommerce-headless' )
+				);
+			} else {
+				$input = array_merge( $input, $mapped );
+				add_settings_error(
+					'funkycommerce_control_center',
+					'layout_import_loaded',
+					__( 'Layout Studio configuration loaded and saved for this site.', 'funkycommerce-headless' ),
+					'updated'
+				);
+			}
 		}
 	}
 
@@ -429,6 +487,10 @@ function funkycommerce_sanitize_control_center( $input ) {
 			if ( isset( $previous[ $key ] ) ) {
 				$output[ $key ] = $previous[ $key ];
 			}
+			continue;
+		}
+		if ( ! array_key_exists( $key, $input ) && array_key_exists( $key, $previous ) ) {
+			$output[ $key ] = $previous[ $key ];
 			continue;
 		}
 		$value          = $input[ $key ] ?? null;
@@ -448,8 +510,14 @@ function funkycommerce_sanitize_control_center( $input ) {
 
 	$languages = function_exists( 'funkycommerce_available_language_slugs' ) ? funkycommerce_available_language_slugs() : array();
 	foreach ( $languages as $language ) {
-		$output[ 'store_tagline_' . $language ] = sanitize_text_field( wp_unslash( $input[ 'store_tagline_' . $language ] ?? '' ) );
-		$output[ 'promo_text_' . $language ]     = wp_kses_post( wp_unslash( $input[ 'promo_text_' . $language ] ?? '' ) );
+		$tagline_key = 'store_tagline_' . $language;
+		$promo_key   = 'promo_text_' . $language;
+		$output[ $tagline_key ] = array_key_exists( $tagline_key, $input )
+			? sanitize_text_field( wp_unslash( $input[ $tagline_key ] ) )
+			: ( $previous[ $tagline_key ] ?? '' );
+		$output[ $promo_key ] = array_key_exists( $promo_key, $input )
+			? wp_kses_post( wp_unslash( $input[ $promo_key ] ) )
+			: ( $previous[ $promo_key ] ?? '' );
 
 		$key   = 'ui_strings_' . $language;
 		$field = array(
@@ -457,7 +525,9 @@ function funkycommerce_sanitize_control_center( $input ) {
 			'type'    => 'json',
 			'default' => '{}',
 		);
-		$output[ $key ] = funkycommerce_sanitize_control_field( $key, $field, $input[ $key ] ?? '{}', $previous[ $key ] ?? '{}' );
+		$output[ $key ] = array_key_exists( $key, $input )
+			? funkycommerce_sanitize_control_field( $key, $field, $input[ $key ], $previous[ $key ] ?? '{}' )
+			: ( $previous[ $key ] ?? '{}' );
 	}
 
 	return $output;
@@ -1013,6 +1083,7 @@ function funkycommerce_render_control_field( $key, $field, $value ) {
 			<?php elseif ( 'media' === $type ) : ?>
 				<div class="fc-media-field"><input id="<?php echo esc_attr( $id ); ?>" type="url" class="regular-text" name="<?php echo esc_attr( $name ); ?>" value="<?php echo esc_attr( $value ); ?>" autocomplete="<?php echo esc_attr( $field['autocomplete'] ?? 'url' ); ?>" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true"><button type="button" class="button fc-media-select" data-target="<?php echo esc_attr( $id ); ?>"><?php esc_html_e( 'Choose file', 'funkycommerce-headless' ); ?></button></div>
 			<?php elseif ( 'multicheck' === $type ) : ?>
+				<input type="hidden" name="<?php echo esc_attr( $name ); ?>[]" value="">
 				<div class="fc-check-grid"><?php foreach ( $field['options'] as $option => $label ) : ?><label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[]" value="<?php echo esc_attr( $option ); ?>" <?php checked( in_array( $option, (array) $value, true ) ); ?>> <?php echo esc_html( $label ); ?></label><?php endforeach; ?></div>
 			<?php elseif ( 'currencies' === $type ) : ?>
 				<?php
@@ -1020,10 +1091,12 @@ function funkycommerce_render_control_field( $key, $field, $value ) {
 				$base       = function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : 'EUR';
 				?>
 				<input class="fc-currency-search regular-text" type="search" placeholder="<?php esc_attr_e( 'Filter currencies…', 'funkycommerce-headless' ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $name ); ?>[]" value="">
 				<div class="fc-check-grid fc-currencies"><?php foreach ( $currencies as $code => $label ) : ?><label data-search="<?php echo esc_attr( strtolower( $code . ' ' . $label ) ); ?>"><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[]" value="<?php echo esc_attr( $code ); ?>" <?php checked( in_array( $code, (array) $value, true ) ); ?> <?php disabled( $base, $code ); ?>> <strong><?php echo esc_html( $code ); ?></strong> <?php echo esc_html( $label ); ?><?php if ( $base === $code ) : ?><input type="hidden" name="<?php echo esc_attr( $name ); ?>[]" value="<?php echo esc_attr( $code ); ?>"><?php endif; ?></label><?php endforeach; ?></div>
 			<?php elseif ( 'social_links' === $type ) : ?>
 				<?php $social_links = funkycommerce_clean_social_links( $value ); ?>
 				<div class="fc-social-links" data-next-index="<?php echo esc_attr( count( $social_links ) ); ?>">
+					<input type="hidden" name="<?php echo esc_attr( $name ); ?>" value="">
 					<div class="fc-social-link-list"><?php foreach ( $social_links as $index => $link ) : funkycommerce_render_social_link_row( $name, $index, $link ); endforeach; ?></div>
 					<template><?php funkycommerce_render_social_link_row( $name, '__INDEX__' ); ?></template>
 					<button type="button" class="button button-secondary fc-social-link-add"><?php esc_html_e( 'Add social profile', 'funkycommerce-headless' ); ?></button>
@@ -1287,40 +1360,43 @@ function funkycommerce_render_control_center() {
 				<button type="button" data-tab="extensions"><?php esc_html_e( 'Premium companions', 'funkycommerce-headless' ); ?></button>
 			</nav>
 
-			<form method="post" action="options.php" class="fc-settings" autocomplete="off">
-				<?php settings_fields( 'funkycommerce_control_center' ); ?>
+			<div class="fc-settings">
 				<?php foreach ( $sections as $section_key => $section ) : ?>
-					<section class="fc-panel" data-section="<?php echo esc_attr( $section_key ); ?>"<?php if ( 'branding' !== $section_key ) : ?> hidden<?php endif; ?>>
-						<div class="fc-panel-heading"><div><h2><?php echo esc_html( $section['title'] ); ?></h2><p><?php echo esc_html( $section['description'] ); ?></p></div><span><?php echo esc_html( count( $section['fields'] ) ); ?> <?php esc_html_e( 'controls', 'funkycommerce-headless' ); ?></span></div>
-						<?php if ( ! empty( $section['preview'] ) ) : ?>
-							<div class="fc-layout-preview" data-layout-preview style="--preview-width:<?php echo esc_attr( $settings['layout_theme_max_width_px'] ?? '1280' ); ?>px;--preview-radius:<?php echo esc_attr( $settings['layout_theme_radius_px'] ?? '16' ); ?>px">
-								<div class="fc-layout-preview-toolbar"><strong><?php esc_html_e( 'Control Center preview', 'funkycommerce-headless' ); ?></strong><span><?php esc_html_e( 'Updates as controls change; the storefront remains canonical.', 'funkycommerce-headless' ); ?></span></div>
-								<div class="fc-layout-preview-canvas">
-									<div class="fc-layout-preview-announcement"></div>
-									<div class="fc-layout-preview-header"><span></span><i></i><i></i><i></i></div>
-									<div class="fc-layout-preview-content"><b></b><span></span><span></span><small data-layout-preview-value="layout_home_hero"><?php echo esc_html( $settings['layout_home_hero'] ?? 'classic' ); ?></small></div>
-									<div class="fc-layout-preview-footer"><span data-layout-preview-value="layout_footer_columns"><?php echo esc_html( $settings['layout_footer_columns'] ?? 'grid-4' ); ?></span></div>
+					<form method="post" action="options.php" class="fc-settings-form" data-section="<?php echo esc_attr( $section_key ); ?>" autocomplete="off"<?php if ( 'branding' !== $section_key ) : ?> hidden<?php endif; ?>>
+						<?php settings_fields( 'funkycommerce_control_center' ); ?>
+						<section class="fc-panel">
+							<div class="fc-panel-heading"><div><h2><?php echo esc_html( $section['title'] ); ?></h2><p><?php echo esc_html( $section['description'] ); ?></p></div><span><?php echo esc_html( count( $section['fields'] ) ); ?> <?php esc_html_e( 'controls', 'funkycommerce-headless' ); ?></span></div>
+							<?php if ( ! empty( $section['preview'] ) ) : ?>
+								<div class="fc-layout-preview" data-layout-preview style="--preview-width:<?php echo esc_attr( $settings['layout_theme_max_width_px'] ?? '1280' ); ?>px;--preview-radius:<?php echo esc_attr( $settings['layout_theme_radius_px'] ?? '16' ); ?>px">
+									<div class="fc-layout-preview-toolbar"><strong><?php esc_html_e( 'Control Center preview', 'funkycommerce-headless' ); ?></strong><span><?php esc_html_e( 'Updates as controls change; the storefront remains canonical.', 'funkycommerce-headless' ); ?></span></div>
+									<div class="fc-layout-preview-canvas">
+										<div class="fc-layout-preview-announcement"></div>
+										<div class="fc-layout-preview-header"><span></span><i></i><i></i><i></i></div>
+										<div class="fc-layout-preview-content"><b></b><span></span><span></span><small data-layout-preview-value="layout_home_hero"><?php echo esc_html( $settings['layout_home_hero'] ?? 'classic' ); ?></small></div>
+										<div class="fc-layout-preview-footer"><span data-layout-preview-value="layout_footer_columns"><?php echo esc_html( $settings['layout_footer_columns'] ?? 'grid-4' ); ?></span></div>
+									</div>
 								</div>
-							</div>
-						<?php endif; ?>
-						<?php foreach ( $section['fields'] as $key => $field ) : funkycommerce_render_control_field( $key, $field, $settings[ $key ] ?? ( $field['default'] ?? '' ) ); endforeach; ?>
-						<?php if ( 'multilingual' === $section_key && function_exists( 'funkycommerce_available_language_slugs' ) ) : ?>
-							<div class="fc-language-values">
-								<h3><?php esc_html_e( 'Language-specific storefront content', 'funkycommerce-headless' ); ?></h3>
-								<p><?php esc_html_e( 'UI strings are JSON key/value maps. Empty translated branding values fall back to the general settings.', 'funkycommerce-headless' ); ?></p>
-								<?php foreach ( funkycommerce_available_language_slugs() as $slug ) : $language = funkycommerce_language_data( $slug ); ?>
-									<details><summary><?php echo esc_html( $language['name'] ); ?></summary>
-										<?php
-										funkycommerce_render_control_field( 'store_tagline_' . $slug, array( 'label' => __( 'Store tagline', 'funkycommerce-headless' ), 'type' => 'text' ), $settings[ 'store_tagline_' . $slug ] ?? '' );
-										funkycommerce_render_control_field( 'promo_text_' . $slug, array( 'label' => __( 'Promotional message', 'funkycommerce-headless' ), 'type' => 'text' ), $settings[ 'promo_text_' . $slug ] ?? '' );
-										$ui_strings = wp_json_encode( funkycommerce_storefront_ui_strings_for_language( $slug ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-										funkycommerce_render_control_field( 'ui_strings_' . $slug, array( 'label' => __( 'Storefront UI strings', 'funkycommerce-headless' ), 'type' => 'json', 'default' => '{}' ), $ui_strings ?: '{}' );
-										?>
-									</details>
-								<?php endforeach; ?>
-							</div>
-						<?php endif; ?>
-					</section>
+							<?php endif; ?>
+							<?php foreach ( $section['fields'] as $key => $field ) : funkycommerce_render_control_field( $key, $field, $settings[ $key ] ?? ( $field['default'] ?? '' ) ); endforeach; ?>
+							<?php if ( 'multilingual' === $section_key && function_exists( 'funkycommerce_available_language_slugs' ) ) : ?>
+								<div class="fc-language-values">
+									<h3><?php esc_html_e( 'Language-specific storefront content', 'funkycommerce-headless' ); ?></h3>
+									<p><?php esc_html_e( 'UI strings are JSON key/value maps. Empty translated branding values fall back to the general settings.', 'funkycommerce-headless' ); ?></p>
+									<?php foreach ( funkycommerce_available_language_slugs() as $slug ) : $language = funkycommerce_language_data( $slug ); ?>
+										<details><summary><?php echo esc_html( $language['name'] ); ?></summary>
+											<?php
+											funkycommerce_render_control_field( 'store_tagline_' . $slug, array( 'label' => __( 'Store tagline', 'funkycommerce-headless' ), 'type' => 'text' ), $settings[ 'store_tagline_' . $slug ] ?? '' );
+											funkycommerce_render_control_field( 'promo_text_' . $slug, array( 'label' => __( 'Promotional message', 'funkycommerce-headless' ), 'type' => 'text' ), $settings[ 'promo_text_' . $slug ] ?? '' );
+											$ui_strings = wp_json_encode( funkycommerce_storefront_ui_strings_for_language( $slug ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+											funkycommerce_render_control_field( 'ui_strings_' . $slug, array( 'label' => __( 'Storefront UI strings', 'funkycommerce-headless' ), 'type' => 'json', 'default' => '{}' ), $ui_strings ?: '{}' );
+											?>
+										</details>
+									<?php endforeach; ?>
+								</div>
+							<?php endif; ?>
+						</section>
+						<div class="fc-save"><?php submit_button( __( 'Save this section', 'funkycommerce-headless' ), 'primary', 'submit', false ); ?><span><?php esc_html_e( 'Only this section is submitted, preventing server input limits from dropping later controls.', 'funkycommerce-headless' ); ?></span></div>
+					</form>
 				<?php endforeach; ?>
 				<section class="fc-panel" data-section="artifacts" hidden>
 					<div class="fc-panel-heading"><div><h2><?php esc_html_e( 'Storefront artifacts', 'funkycommerce-headless' ); ?></h2><p><?php esc_html_e( 'Observe the current site-isolated cache and queue bounded recovery work. These actions do not save unsaved settings above.', 'funkycommerce-headless' ); ?></p></div></div>
@@ -1354,8 +1430,7 @@ function funkycommerce_render_control_center() {
 				</section>
 				<?php funkycommerce_render_coverage(); ?>
 				<?php funkycommerce_render_extensions(); ?>
-				<div class="fc-save"><?php submit_button( __( 'Save theme controls', 'funkycommerce-headless' ), 'primary', 'submit', false ); ?><span><?php esc_html_e( 'All core controls are stored in one versionable option.', 'funkycommerce-headless' ); ?></span></div>
-			</form>
+			</div>
 			<form id="funkycommerce-artifact-operations" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" hidden>
 				<?php wp_nonce_field( 'funkycommerce_artifact_operation', 'funkycommerce_artifact_nonce' ); ?>
 			</form>
@@ -1450,7 +1525,7 @@ function funkycommerce_render_control_center() {
 		document.addEventListener('DOMContentLoaded', function () {
 			const tabs = document.querySelectorAll('.fc-tabs [data-tab]');
 			const panels = document.querySelectorAll('.fc-panel[data-section]');
-			const form = document.querySelector('.fc-settings');
+			const forms = document.querySelectorAll('.fc-settings-form');
 			const tabStorageKey = 'funkycommerce-control-center-active-tab';
 			tabs.forEach(function (tab) {
 				tab.addEventListener('click', function () {
@@ -1471,7 +1546,7 @@ function funkycommerce_render_control_center() {
 			const requested = location.hash.replace('#fc-', '') || savedTab;
 			const requestedTab = requested && document.querySelector('.fc-tabs [data-tab="' + CSS.escape(requested) + '"]');
 			if (requestedTab) requestedTab.click();
-			if (form) {
+			forms.forEach(function (form) {
 				form.addEventListener('input', function (event) {
 					const preview = document.querySelector('[data-layout-preview]');
 					if (!preview || !event.target.name) return;
@@ -1490,7 +1565,7 @@ function funkycommerce_render_control_center() {
 						// Saving settings must not depend on browser storage availability.
 					}
 				});
-			}
+			});
 			document.querySelectorAll('.fc-media-select').forEach(function (button) {
 				button.addEventListener('click', function () {
 					const frame = wp.media({ title: '<?php echo esc_js( __( 'Choose a storefront asset', 'funkycommerce-headless' ) ); ?>', multiple: false });
@@ -1501,7 +1576,7 @@ function funkycommerce_render_control_center() {
 			document.querySelectorAll('.fc-currency-search').forEach(function (search) {
 				search.addEventListener('input', function () {
 					const query = search.value.trim().toLowerCase();
-					search.nextElementSibling.querySelectorAll('label').forEach(function (label) { label.hidden = !label.dataset.search.includes(query); });
+					search.parentElement.querySelector('.fc-currencies').querySelectorAll('label').forEach(function (label) { label.hidden = !label.dataset.search.includes(query); });
 				});
 			});
 			document.querySelectorAll('.fc-toggle input').forEach(function (input) {
