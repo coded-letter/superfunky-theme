@@ -58,9 +58,6 @@ function funkycommerce_static_generation_config() {
  * Expose public build inputs to CI without exposing privileged deployment settings.
  */
 function funkycommerce_register_static_generation_graphql() {
-	if ( ! funkycommerce_is_headless_mode() ) {
-		return;
-	}
 	register_graphql_field(
 		'RootQuery',
 		'funkycommerceStaticGenerationConfig',
