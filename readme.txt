@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.15
+Stable tag: 1.2.16
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,11 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.16 highlights ==
+
+* Adds validated H1-H6 controls to video heroes and keeps static hero heading levels consistent in native and headless rendering.
+* Fixes root fragment links from nested routes, honors the interaction-sound toggle, and exposes default-language UI strings without requiring Polylang.
 
 == 1.2.15 highlights ==
 

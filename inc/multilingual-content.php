@@ -41,6 +41,15 @@ function funkycommerce_polylang_taxonomies( $taxonomies, $is_settings ) {
 }
 add_filter( 'pll_get_taxonomies', 'funkycommerce_polylang_taxonomies', 10, 2 );
 
+function funkycommerce_site_default_language_slug() {
+	$locale = (string) get_option( 'WPLANG', '' );
+	if ( '' === $locale ) {
+		$locale = 'en_US';
+	}
+	$slug = sanitize_key( strtolower( strtok( $locale, '_-' ) ) );
+	return $slug ?: 'en';
+}
+
 function funkycommerce_available_language_slugs() {
 	if ( ! function_exists( 'pll_languages_list' ) ) {
 		return array();
@@ -274,6 +283,13 @@ function funkycommerce_language_data( $slug ) {
 		'locale' => '',
 	);
 	if ( ! function_exists( 'pll_languages_list' ) ) {
+		$locale = (string) get_option( 'WPLANG', '' );
+		$locale = $locale ?: 'en_US';
+		if ( funkycommerce_site_default_language_slug() === $slug ) {
+			$translations   = function_exists( 'wp_get_available_translations' ) ? wp_get_available_translations() : array();
+			$data['name']   = (string) ( $translations[ $locale ]['native_name'] ?? $locale );
+			$data['locale'] = $locale;
+		}
 		return $data;
 	}
 
