@@ -1524,7 +1524,7 @@ function funkycommerce_render_control_center() {
 	<script>
 		document.addEventListener('DOMContentLoaded', function () {
 			const tabs = document.querySelectorAll('.fc-tabs [data-tab]');
-			const panels = document.querySelectorAll('.fc-panel[data-section]');
+			const panels = document.querySelectorAll('.fc-settings-form[data-section], .fc-panel[data-section]');
 			const forms = document.querySelectorAll('.fc-settings-form');
 			const tabStorageKey = 'funkycommerce-control-center-active-tab';
 			tabs.forEach(function (tab) {
