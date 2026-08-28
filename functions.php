@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.11' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.12' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -1096,15 +1096,62 @@ function funkycommerce_with_headless_shortcode_markers( $callback ) {
 }
 
 /**
+ * Remove WordPress paragraph formatting accidentally stored inside CSS blocks.
+ */
+function funkycommerce_normalize_headless_style_content( $content ) {
+	$normalized = preg_replace_callback(
+		'#(<style\b[^>]*>)(.*?)(</style\s*>)#is',
+		static function ( $matches ) {
+			$style = $matches[2];
+
+			if (
+				! preg_match( '#<br\s*/?>#i', $style )
+				|| ! preg_match( '#</p>\s*<p(?:\s[^>]*)?>#i', $style )
+			) {
+				return $matches[0];
+			}
+
+			$style = preg_replace( '#<br\s*/?>#i', "\n", $style );
+			$style = preg_replace( '#</?p(?:\s[^>]*)?>#i', "\n", $style );
+
+			return $matches[1] . $style . $matches[3];
+		},
+		$content
+	);
+
+	return is_string( $normalized ) ? $normalized : $content;
+}
+
+/**
+ * Remove paragraph wrappers that content filters add around protected code placeholders.
+ */
+function funkycommerce_unwrap_headless_code_placeholders( $content ) {
+	$placeholder = '<pre data-funkycommerce-preserved-code="fc-preserved-code-\d+"></pre>';
+	$patterns    = array(
+		'#<p(?:\s[^>]*)?>\s*(' . $placeholder . ')\s*</p>#i',
+		'#<p(?:\s[^>]*)?>\s*(' . $placeholder . ')#i',
+		'#(' . $placeholder . ')\s*</p>#i',
+	);
+
+	foreach ( $patterns as $pattern ) {
+		$unwrapped = preg_replace( $pattern, '$1', $content );
+		$content   = is_string( $unwrapped ) ? $unwrapped : $content;
+	}
+
+	return $content;
+}
+
+/**
  * Run content filters without allowing paragraph formatting inside code tags.
  */
 function funkycommerce_filter_headless_content( $content, $filter = 'the_content' ) {
 	$preserved = array();
+	$content   = funkycommerce_normalize_headless_style_content( $content );
 	$protected = preg_replace_callback(
 		'#<(script|style)\b[^>]*>.*?</\1\s*>#is',
 		static function ( $matches ) use ( &$preserved ) {
 			$key         = 'fc-preserved-code-' . count( $preserved );
-			$placeholder = '<div data-funkycommerce-preserved-code="' . $key . '"></div>';
+			$placeholder = '<pre data-funkycommerce-preserved-code="' . $key . '"></pre>';
 			$preserved[ $placeholder ] = $matches[0];
 			return $placeholder;
 		},
@@ -1116,8 +1163,10 @@ function funkycommerce_filter_headless_content( $content, $filter = 'the_content
 			return apply_filters( $filter, $protected );
 		}
 	);
+	$filtered = funkycommerce_unwrap_headless_code_placeholders( $filtered );
+	$filtered = strtr( $filtered, $preserved );
 
-	return strtr( $filtered, $preserved );
+	return funkycommerce_normalize_headless_style_content( $filtered );
 }
 
 /**
