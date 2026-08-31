@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.18
+Stable tag: 1.2.19
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,12 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.19 highlights ==
+
+* Preserves product image aspect ratios in galleries and lightboxes and serves linked media-library PDFs through the storefront domain.
+* Keeps all public archive surfaces indexable and completes translated archive, inquiry, rating, review, comment, and related-product UI.
+* Adds product wishlist and description-order controls, expanded footer/header layouts, an accessible back-to-top button, and persistent free-theme attribution.
 
 == 1.2.18 highlights ==
 
