@@ -733,6 +733,10 @@ function funkycommerce_storefront_control_settings( $language = '' ) {
 	$assistant_show_footer = $has_surface_settings ? 'yes' === $settings['ai_assistant_show_footer'] : 'footer' === $legacy_placement;
 	$assistant_show_fixed  = $has_surface_settings ? 'yes' === $settings['ai_assistant_show_fixed'] : 'fixed' === $legacy_placement;
 	$assistant_placement   = $assistant_show_header ? 'header' : ( $assistant_show_fixed ? 'fixed' : 'footer' );
+	$default_theme_credit  = 'Made with <a href="https://superfunky.pro" target="_blank" rel="noopener noreferrer">superfuky WP theme</a> by <a href="https://codedletter.com" target="_blank" rel="noopener noreferrer">Coded Letter</a>.';
+	$theme_credit          = funkycommerce_is_pro()
+		? wp_kses_post( (string) ( $settings['theme_credit_text'] ?? $default_theme_credit ) )
+		: $default_theme_credit;
 
 	return array(
 		'branding' => array(
@@ -766,6 +770,8 @@ function funkycommerce_storefront_control_settings( $language = '' ) {
 			'newsletterPrivacyLabel'  => (string) ( $settings['newsletter_privacy_label'] ?? '' ),
 			'extraHtml'               => (string) ( $settings['footer_extra_content'] ?? '' ),
 			'copyrightText'           => wp_kses_post( (string) ( $settings['copyright_text'] ?? '' ) ),
+			'themeCredit'             => $theme_credit ?: $default_theme_credit,
+			'showThemeCredit'         => ! funkycommerce_is_pro() || 'yes' === ( $settings['show_theme_credit'] ?? 'yes' ),
 			'spotifyPlaylistUrl'      => funkycommerce_normalize_spotify_playlist_url( $settings['spotify_playlist_url'] ?? '' ),
 			'spotifyPlaylistEmbedUrl' => funkycommerce_spotify_playlist_embed_url( $settings['spotify_playlist_url'] ?? '' ),
 			'spotifyPlayerTitle'       => sanitize_text_field( (string) ( $settings['spotify_player_title'] ?? '' ) ),

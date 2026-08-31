@@ -394,6 +394,8 @@ function funkycommerce_register_navigation_commerce_graphql() {
 				'newsletterPrivacyLabel' => array( 'type' => array( 'non_null' => 'String' ) ),
 				'extraHtml'              => array( 'type' => array( 'non_null' => 'String' ) ),
 				'copyrightText'          => array( 'type' => array( 'non_null' => 'String' ) ),
+				'themeCredit'            => array( 'type' => array( 'non_null' => 'String' ) ),
+				'showThemeCredit'        => array( 'type' => array( 'non_null' => 'Boolean' ) ),
 				'spotifyPlaylistUrl'     => array( 'type' => 'String' ),
 				'spotifyPlaylistEmbedUrl' => array( 'type' => 'String' ),
 				'spotifyPlayerTitle'     => array( 'type' => array( 'non_null' => 'String' ) ),
