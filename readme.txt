@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.19
+Stable tag: 1.2.20
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,13 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.20 highlights ==
+
+* Recovers header controls incorrectly disabled by section-specific Control Center saves and preserves schema defaults for newly introduced fields.
+* Adds true single-row and floating-island headers, three-column footers, and configurable newsletter, assistant, and Spotify combinations.
+* Improves multilingual blog and product-tag shortcodes, frontend favicon handoff, archive indexing, translations, and product/hero presentation.
+* Uses cart-scoped payment, shipping, and tax availability at checkout, gates translated cart recovery on its companion plugin, and blocks unavailable products from cart actions.
 
 == 1.2.19 highlights ==
 

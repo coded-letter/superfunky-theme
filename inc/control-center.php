@@ -31,6 +31,7 @@ function funkycommerce_control_center_settings() {
 		}
 	}
 	$saved = (array) get_option( 'funkycommerce_control_center', array() );
+	$saved = funkycommerce_recover_corrupted_header_visibility( $saved );
 
 	if ( ! array_key_exists( 'custom_css', $saved ) ) {
 		$saved['custom_css'] = (string) get_option( 'funkycommerce_custom_css', '' );
@@ -59,6 +60,51 @@ function funkycommerce_control_center_settings() {
 	}
 
 	return array_merge( $defaults, $saved );
+}
+
+/**
+ * Recover header controls corrupted by section-specific settings saves.
+ *
+ * Earlier releases initialized fields omitted by the submitted section as empty
+ * values. The numeric minima and an entirely disabled header form a sufficiently
+ * specific fingerprint to repair without replacing intentional layout choices.
+ *
+ * @param array<string, mixed> $saved Raw Control Center settings.
+ * @return array<string, mixed>
+ */
+function funkycommerce_recover_corrupted_header_visibility( $saved ) {
+	$recovery_option = 'funkycommerce_header_visibility_recovery_1';
+	if ( 'yes' === get_option( $recovery_option, 'no' ) ) {
+		return $saved;
+	}
+
+	$header_keys = array(
+		'layout_show_header_logo',
+		'layout_show_header_search_icon',
+		'layout_show_header_language_switcher',
+		'layout_show_header_currency_switcher',
+		'layout_show_header_dark_mode_toggle',
+		'layout_show_header_account_link',
+		'layout_show_header_reading_list_link',
+		'layout_show_header_wishlist_link',
+		'layout_show_header_cart_icon',
+		'layout_show_header_publish_button',
+	);
+	$has_corruption_fingerprint = '960' === (string) ( $saved['layout_theme_max_width_px'] ?? '' )
+		&& '0' === (string) ( $saved['layout_theme_radius_px'] ?? '' )
+		&& '1' === (string) ( $saved['layout_newsletter_popup_cooldown_days'] ?? '' )
+		&& count( $header_keys ) === count( array_filter( $header_keys, static fn( $key ) => 'no' === ( $saved[ $key ] ?? null ) ) );
+
+	add_option( $recovery_option, 'yes', '', false );
+	if ( ! $has_corruption_fingerprint ) {
+		return $saved;
+	}
+
+	foreach ( $header_keys as $key ) {
+		$saved[ $key ] = 'yes';
+	}
+	update_option( 'funkycommerce_control_center', $saved, false );
+	return $saved;
 }
 
 /**
@@ -493,7 +539,7 @@ function funkycommerce_sanitize_control_center( $input ) {
 			$output[ $key ] = $previous[ $key ];
 			continue;
 		}
-		$value          = $input[ $key ] ?? null;
+		$value          = array_key_exists( $key, $input ) ? $input[ $key ] : ( $field['default'] ?? null );
 		$output[ $key ] = funkycommerce_sanitize_control_field( $key, $field, $value, $previous[ $key ] ?? ( $field['default'] ?? '' ) );
 	}
 	$output['layout_schema_version'] = 1;
