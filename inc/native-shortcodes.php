@@ -73,6 +73,7 @@ function funkycommerce_register_native_shortcodes() {
 	add_shortcode( 'grid', 'funkycommerce_native_render_grid' );
 	add_shortcode( 'tags', 'funkycommerce_native_render_tags' );
 	add_shortcode( 'product-tags', 'funkycommerce_native_render_product_tags' );
+	add_shortcode( 'product_tags', 'funkycommerce_native_render_product_tags' );
 	add_shortcode( 'authors', 'funkycommerce_native_render_authors' );
 	add_shortcode( 'reviews', 'funkycommerce_native_render_reviews' );
 	add_shortcode( 'comments', 'funkycommerce_native_render_comments' );
@@ -1052,6 +1053,12 @@ function funkycommerce_native_render_categories( $atts ) {
 	if ( $include ) {
 		$query_args['slug'] = $include;
 	}
+	if ( function_exists( 'pll_current_language' ) ) {
+		$language = sanitize_key( (string) pll_current_language( 'slug' ) );
+		if ( $language ) {
+			$query_args['lang'] = $language;
+		}
+	}
 
 	$terms = get_terms( $query_args );
 	if ( is_wp_error( $terms ) || empty( $terms ) ) {
@@ -1291,6 +1298,9 @@ function funkycommerce_native_render_grid( $atts ) {
  */
 function funkycommerce_native_render_tags( $atts ) {
 	$a = funkycommerce_native_prepare_content_attributes( 'tags', $atts );
+	if ( 'product' === ( $a['type'] ?? 'post' ) ) {
+		return funkycommerce_native_render_product_tags( $atts );
+	}
 
 	$include = ! empty( $a['include'] ) ? funkycommerce_native_csv_terms( $a['include'] ) : array();
 

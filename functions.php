@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.19' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.20' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -251,6 +251,7 @@ function funkycommerce_headless_content_shortcodes() {
 		'sticky_posts',
 		'tags',
 		'product-tags',
+		'product_tags',
 		'authors',
 		'reviews',
 		'comments',
@@ -549,6 +550,7 @@ function funkycommerce_content_shortcode_schemas() {
 		'sticky-posts'     => $sticky_posts_schema,
 		'sticky_posts'     => $sticky_posts_schema,
 		'tags'             => array(
+			'type'    => array( 'default' => 'post', 'enum' => array( 'post', 'product' ) ),
 			'layout'  => array( 'default' => 'pills', 'enum' => array( 'pills', 'cards', 'compact' ) ),
 			'offset'  => funkycommerce_collection_shortcode_offset_definition(),
 			'limit'   => array( 'default' => 24, 'type' => 'integer', 'min' => 1, 'max' => 100 ),
@@ -558,6 +560,15 @@ function funkycommerce_content_shortcode_schemas() {
 			'title'   => array( 'default' => __( 'Tags', 'funkycommerce-headless' ) ),
 		),
 		'product-tags'     => array(
+			'layout'  => array( 'default' => 'pills', 'enum' => array( 'pills', 'cards', 'compact' ) ),
+			'offset'  => funkycommerce_collection_shortcode_offset_definition(),
+			'limit'   => array( 'default' => 24, 'type' => 'integer', 'min' => 1, 'max' => 100 ),
+			'include' => array( 'default' => '' ),
+			'orderby' => array( 'default' => 'name', 'enum' => array( 'name', 'count', 'include' ) ),
+			'order'   => array( 'default' => 'asc', 'enum' => array( 'asc', 'desc' ) ),
+			'title'   => array( 'default' => __( 'Product tags', 'funkycommerce-headless' ) ),
+		),
+		'product_tags'     => array(
 			'layout'  => array( 'default' => 'pills', 'enum' => array( 'pills', 'cards', 'compact' ) ),
 			'offset'  => funkycommerce_collection_shortcode_offset_definition(),
 			'limit'   => array( 'default' => 24, 'type' => 'integer', 'min' => 1, 'max' => 100 ),

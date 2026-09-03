@@ -28,6 +28,7 @@ final class FunkyCommerce_Artifact_Renderer {
 			'grid'                        => 'funkycommerce_native_render_grid',
 			'tags'                        => 'funkycommerce_native_render_tags',
 			'product-tags'                => 'funkycommerce_native_render_product_tags',
+			'product_tags'                => 'funkycommerce_native_render_product_tags',
 			'authors'                     => 'funkycommerce_native_render_authors',
 			'reviews'                     => 'funkycommerce_native_render_reviews',
 			'comments'                    => 'funkycommerce_native_render_comments',
