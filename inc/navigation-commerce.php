@@ -506,6 +506,28 @@ function funkycommerce_register_navigation_commerce_graphql() {
 		)
 	);
 	register_graphql_field(
+		'Page',
+		'isShopPage',
+		array(
+			'type'        => array( 'non_null' => 'Boolean' ),
+			'description' => 'Whether this page is the WooCommerce shop page or one of its Polylang translations.',
+			'resolve'     => function ( $source ) {
+				$page_id = isset( $source->databaseId ) ? (int) $source->databaseId : ( isset( $source->ID ) ? (int) $source->ID : 0 );
+				$shop_id = (int) get_option( 'woocommerce_shop_page_id', 0 );
+				if ( ! $page_id || ! $shop_id ) {
+					return false;
+				}
+				if ( $page_id === $shop_id ) {
+					return true;
+				}
+				$translations = function_exists( 'pll_get_post_translations' )
+					? (array) pll_get_post_translations( $shop_id )
+					: array();
+				return in_array( $page_id, array_map( 'intval', $translations ), true );
+			},
+		)
+	);
+	register_graphql_field(
 		'RootQuery',
 		'funkycommerceStorefrontConfig',
 		array(
