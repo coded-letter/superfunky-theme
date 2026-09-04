@@ -288,6 +288,7 @@
   "product.related_loading": "関連商品を読み込み中",
   "search.placeholder": "商品、ストーリー、ユーザー、タグを検索…",
   "search.open": "検索を開く",
+  "search.title": "検索",
   "search.close": "検索を閉じる",
   "header.theme.toggle": "カラーモードを切り替える",
   "header.theme.light": "ライトモードに切り替える",
