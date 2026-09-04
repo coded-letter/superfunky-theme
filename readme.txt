@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.20
+Stable tag: 1.2.21
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,13 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.21 highlights ==
+
+* Supports capability-gated private pages and password-protected content without exposing protected pages through public caches, feeds, search, sitemaps, or prerendering.
+* Preserves safe storefront return paths through login, registration, and provider authentication while rejecting external redirects.
+* Adds opaque storefront media aliases while keeping existing upload links compatible.
+* Adds full-screen header search, configurable mobile-menu dimensions, and a global code-block controls setting.
 
 == 1.2.20 highlights ==
 
