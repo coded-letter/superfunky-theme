@@ -1,4 +1,8 @@
 {
+  "layout.search.style": "Styl wyszukiwania",
+  "layout.search.full_width": "Pasek pełnej szerokości",
+  "layout.search.expandable": "Ikona → rozwijane pole",
+  "layout.search.overlay": "Nakładka pełnoekranowa",
   "cart.title": "Twój koszyk",
   "cart.aria": "Koszyk zakupowy",
   "cart.close": "Zamknij koszyk",
@@ -682,6 +686,9 @@
   "navigation.back_to_top": "Wróć na górę",
   "nav.shop": "Sklep",
   "nav.blog": "Blog",
+  "inquiry.heading": "Zapytanie o produkt",
+  "inquiry.button": "Zapytaj o ten produkt",
+  "inquiry.copy": "Wyślij nam wiadomość, a skontaktujemy się z Tobą w sprawie dostępności i ceny.",
   "inquiry.error": "Nie udało się wysłać zapytania. Spróbuj ponownie.",
   "inquiry.success": "Zapytanie zostało wysłane. Wkrótce odpowiemy e-mailem.",
   "inquiry.field.name": "Imię i nazwisko",

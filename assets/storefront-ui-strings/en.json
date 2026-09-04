@@ -1,4 +1,8 @@
 {
+  "layout.search.style": "Search style",
+  "layout.search.full_width": "Full-width bar",
+  "layout.search.expandable": "Icon → expands",
+  "layout.search.overlay": "Full-screen overlay",
   "cart.title": "Your cart",
   "cart.aria": "Shopping cart",
   "cart.close": "Close cart",
@@ -682,6 +686,9 @@
   "navigation.back_to_top": "Back to top",
   "nav.shop": "Shop",
   "nav.blog": "Blog",
+  "inquiry.heading": "Product inquiry",
+  "inquiry.button": "Ask about this product",
+  "inquiry.copy": "Send us a message and we will follow up with availability and pricing.",
   "inquiry.error": "The inquiry could not be sent. Please try again.",
   "inquiry.success": "Your inquiry has been sent. We'll follow up by email shortly.",
   "inquiry.field.name": "Name",

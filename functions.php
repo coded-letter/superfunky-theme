@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.20' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.21' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -132,6 +132,7 @@ function funkycommerce_frontend_url( $path = '' ) {
 }
 
 require_once get_template_directory() . '/inc/headless-login.php';
+require_once get_template_directory() . '/inc/protected-content.php';
 require_once get_template_directory() . '/inc/notifications.php';
 require_once get_template_directory() . '/inc/checkout-context.php';
 require_once get_template_directory() . '/inc/community.php';
@@ -847,6 +848,20 @@ function funkycommerce_apply_content_shortcode_aliases( $attributes, $tag ) {
 			'p'      => 'descriptions',
 			'bgimgs' => 'images',
 			'pill'   => 'kickers',
+		);
+	}
+	if ( in_array( $tag, array( 'slider', 'carousel', 'grid' ), true ) ) {
+		$aliases = array_merge(
+			array(
+				'content_type'     => 'type',
+				'post_type'        => 'type',
+				'categories'       => 'category',
+				'product_category' => 'category',
+				'post_category'    => 'category',
+				'tags'             => 'tag',
+				'authors'          => 'author',
+			),
+			$aliases
 		);
 	}
 	foreach ( $aliases as $alias => $canonical ) {

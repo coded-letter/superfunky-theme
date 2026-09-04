@@ -218,6 +218,37 @@ function funkycommerce_native_csv_ints( $value ) {
 }
 
 /**
+ * Resolve comma-separated user IDs, logins, or nicenames to user IDs.
+ *
+ * A supplied list containing no valid users deliberately resolves to an empty
+ * result, rather than accidentally removing the author constraint.
+ *
+ * @param string $value Raw author filter.
+ * @return int[]
+ */
+function funkycommerce_native_author_ids( $value ) {
+	$ids = array();
+	foreach ( preg_split( '/[\s,|]+/', trim( (string) $value ) ) as $candidate ) {
+		if ( '' === $candidate ) {
+			continue;
+		}
+		if ( ctype_digit( $candidate ) && (int) $candidate > 0 ) {
+			$user = get_user_by( 'id', (int) $candidate );
+		} else {
+			$slug = sanitize_title( $candidate );
+			$user = $slug ? get_user_by( 'slug', $slug ) : false;
+			if ( ! $user && $slug ) {
+				$user = get_user_by( 'login', $slug );
+			}
+		}
+		if ( $user ) {
+			$ids[] = (int) $user->ID;
+		}
+	}
+	return array_values( array_unique( $ids ) );
+}
+
+/**
  * Parse a comma-separated list of taxonomy term slugs.
  *
  * Convention (undocumented upstream, decided here): `category`/`tag`/`tags`
@@ -438,7 +469,7 @@ function funkycommerce_native_query_products( $filters, $args_overrides = array(
 	}
 
 	if ( ! empty( $filters['author'] ) ) {
-		$author_ids = funkycommerce_native_csv_ints( $filters['author'] );
+		$author_ids = funkycommerce_native_author_ids( $filters['author'] );
 		if ( ! $author_ids ) {
 			return $empty;
 		}
@@ -558,7 +589,7 @@ function funkycommerce_native_query_posts( $post_type, $filters, $args_overrides
 		$args['tax_query'] = $tax_query; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
 	}
 
-	$author_ids = ! empty( $filters['author'] ) ? funkycommerce_native_csv_ints( $filters['author'] ) : array();
+	$author_ids = ! empty( $filters['author'] ) ? funkycommerce_native_author_ids( $filters['author'] ) : array();
 	if ( $is_community ) {
 		$visible = function_exists( 'funkycommerce_visible_community_user_ids' ) ? funkycommerce_visible_community_user_ids() : array();
 		$scoped  = $author_ids ? array_values( array_intersect( $author_ids, $visible ) ) : $visible;
@@ -1127,7 +1158,7 @@ function funkycommerce_native_render_slider( $atts ) {
 	$kickers      = funkycommerce_native_slider_split( $a['kickers'] );
 
 	$manual_count = max( count( $titles ), count( $descriptions ), count( $images ), count( $kickers ) );
-	$is_manual    = $manual_count > 0 || '' !== trim( (string) $a['title'] );
+	$is_manual    = in_array( $a['type'], array( 'campaign', 'cinematic' ), true ) || $manual_count > 0;
 
 	$slides_html = '';
 	$count       = 0;
@@ -1167,7 +1198,7 @@ function funkycommerce_native_render_slider( $atts ) {
 	} else {
 		$type    = in_array( $a['type'], array( 'product', 'post' ), true ) ? $a['type'] : 'product';
 		$filters = $a;
-		$filters['limit'] = min( max( 1, (int) $a['slides'] ), max( 1, (int) $a['limit'] ) );
+		$filters['limit'] = max( 1, (int) $a['limit'] );
 		$result  = funkycommerce_native_query_by_type( $type, $filters );
 		foreach ( $result['ids'] as $id ) {
 			$card = funkycommerce_native_card_for_type( $type, $id, $a['card_variant'] );

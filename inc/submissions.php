@@ -511,6 +511,9 @@ function funkycommerce_store_submission_files( WP_REST_Request $request, $settin
 	if ( ! $files ) {
 		return array();
 	}
+	if ( ! funkycommerce_is_pro() ) {
+		return new WP_Error( 'funkycommerce_uploads_require_pro', __( 'File uploads require Superfunky Pro.', 'funkycommerce-headless' ), array( 'status' => 403 ) );
+	}
 	if ( 'yes' !== ( $settings['forms_upload_enabled'] ?? 'no' ) ) {
 		return new WP_Error( 'funkycommerce_uploads_disabled', __( 'File uploads are not enabled for this form.', 'funkycommerce-headless' ), array( 'status' => 400 ) );
 	}
@@ -589,9 +592,6 @@ function funkycommerce_delete_stored_submission_files( $files ) {
  */
 function funkycommerce_rest_create_form_submission( WP_REST_Request $request ) {
 	$settings = function_exists( 'funkycommerce_control_center_settings' ) ? funkycommerce_control_center_settings() : array();
-	if ( ! funkycommerce_is_pro() ) {
-		return new WP_Error( 'funkycommerce_forms_disabled', __( 'Multi-input form submissions require Superfunky Pro.', 'funkycommerce-headless' ), array( 'status' => 503 ) );
-	}
 
 	$rate_check = funkycommerce_check_submission_rate_limit( 'form' );
 	if ( is_wp_error( $rate_check ) ) {
@@ -915,7 +915,7 @@ function funkycommerce_render_submission_form( $attributes = array() ) {
 			'formId'   => 'sample-contact',
 			'formName' => __( 'Sample contact form', 'funkycommerce-headless' ),
 			'title'    => __( 'Contact us', 'funkycommerce-headless' ),
-			'uploads'  => 'yes',
+			'uploads'  => 'no',
 		),
 		$attributes
 	);
@@ -930,7 +930,7 @@ function funkycommerce_render_submission_form( $attributes = array() ) {
 			<p><label><?php esc_html_e( 'Name', 'funkycommerce-headless' ); ?><br><input name="Name" type="text" maxlength="160" required></label></p>
 			<p><label><?php esc_html_e( 'Email', 'funkycommerce-headless' ); ?><br><input name="Email" type="email" maxlength="254" required></label></p>
 			<p><label><?php esc_html_e( 'Message', 'funkycommerce-headless' ); ?><br><textarea name="Message" maxlength="5000" rows="6" required></textarea></label></p>
-			<?php if ( 'yes' === $attributes['uploads'] ) : ?>
+			<?php if ( 'yes' === $attributes['uploads'] && funkycommerce_is_pro() ) : ?>
 				<p><label><?php esc_html_e( 'Attachments', 'funkycommerce-headless' ); ?><br><input name="files[]" type="file" multiple></label></p>
 			<?php endif; ?>
 			<div hidden aria-hidden="true"><label><?php esc_html_e( 'Website', 'funkycommerce-headless' ); ?><input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
@@ -993,7 +993,7 @@ function funkycommerce_register_submission_form_block() {
 				'formId'   => array( 'type' => 'string', 'default' => 'sample-contact' ),
 				'formName' => array( 'type' => 'string', 'default' => __( 'Sample contact form', 'funkycommerce-headless' ) ),
 				'title'    => array( 'type' => 'string', 'default' => __( 'Contact us', 'funkycommerce-headless' ) ),
-				'uploads'  => array( 'type' => 'boolean', 'default' => true ),
+				'uploads'  => array( 'type' => 'boolean', 'default' => false ),
 			),
 			'render_callback' => static function ( $attributes ) {
 				$attributes['uploads'] = ! empty( $attributes['uploads'] ) ? 'yes' : 'no';

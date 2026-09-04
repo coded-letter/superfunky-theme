@@ -1,4 +1,8 @@
 {
+  "layout.search.style": "検索スタイル",
+  "layout.search.full_width": "全幅バー",
+  "layout.search.expandable": "アイコン → 展開",
+  "layout.search.overlay": "全画面オーバーレイ",
   "cart.title": "カート",
   "cart.aria": "ショッピングカート",
   "cart.close": "カートを閉じる",
@@ -682,6 +686,9 @@
   "navigation.back_to_top": "ページ上部へ",
   "nav.shop": "ショップ",
   "nav.blog": "ブログ",
+  "inquiry.heading": "商品に関するお問い合わせ",
+  "inquiry.button": "この商品について問い合わせる",
+  "inquiry.copy": "メッセージをお送りください。在庫状況と価格についてご連絡いたします。",
   "inquiry.error": "お問い合わせを送信できませんでした。もう一度お試しください。",
   "inquiry.success": "お問い合わせを送信しました。まもなくメールでご連絡します。",
   "inquiry.field.name": "お名前",
