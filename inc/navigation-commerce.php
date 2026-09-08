@@ -9,6 +9,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Determine whether a page is a configured WordPress/WooCommerce page or one
+ * of its Polylang translations.
+ *
+ * @param int $page_id       Candidate page ID.
+ * @param int $configured_id Configured source page ID.
+ * @return bool
+ */
+function funkycommerce_is_configured_page_or_translation( $page_id, $configured_id ) {
+	$page_id       = (int) $page_id;
+	$configured_id = (int) $configured_id;
+	if ( ! $page_id || ! $configured_id ) {
+		return false;
+	}
+	if ( $page_id === $configured_id ) {
+		return true;
+	}
+	$translations = function_exists( 'pll_get_post_translations' )
+		? (array) pll_get_post_translations( $configured_id )
+		: array();
+	return in_array( $page_id, array_map( 'intval', $translations ), true );
+}
+
 function funkycommerce_currency_settings() {
 	$base             = funkycommerce_base_currency();
 	$control_settings = (array) get_option( 'funkycommerce_control_center', array() );
@@ -514,16 +537,33 @@ function funkycommerce_register_navigation_commerce_graphql() {
 			'resolve'     => function ( $source ) {
 				$page_id = isset( $source->databaseId ) ? (int) $source->databaseId : ( isset( $source->ID ) ? (int) $source->ID : 0 );
 				$shop_id = (int) get_option( 'woocommerce_shop_page_id', 0 );
-				if ( ! $page_id || ! $shop_id ) {
-					return false;
-				}
-				if ( $page_id === $shop_id ) {
-					return true;
-				}
-				$translations = function_exists( 'pll_get_post_translations' )
-					? (array) pll_get_post_translations( $shop_id )
-					: array();
-				return in_array( $page_id, array_map( 'intval', $translations ), true );
+				return funkycommerce_is_configured_page_or_translation( $page_id, $shop_id );
+			},
+		)
+	);
+	register_graphql_field(
+		'Page',
+		'isPrivacyPolicyPage',
+		array(
+			'type'        => array( 'non_null' => 'Boolean' ),
+			'description' => 'Whether this page is the WordPress privacy policy page or one of its Polylang translations.',
+			'resolve'     => function ( $source ) {
+				$page_id    = isset( $source->databaseId ) ? (int) $source->databaseId : ( isset( $source->ID ) ? (int) $source->ID : 0 );
+				$privacy_id = (int) get_option( 'wp_page_for_privacy_policy', 0 );
+				return funkycommerce_is_configured_page_or_translation( $page_id, $privacy_id );
+			},
+		)
+	);
+	register_graphql_field(
+		'Page',
+		'isTermsPage',
+		array(
+			'type'        => array( 'non_null' => 'Boolean' ),
+			'description' => 'Whether this page is the WooCommerce terms page or one of its Polylang translations.',
+			'resolve'     => function ( $source ) {
+				$page_id  = isset( $source->databaseId ) ? (int) $source->databaseId : ( isset( $source->ID ) ? (int) $source->ID : 0 );
+				$terms_id = (int) get_option( 'woocommerce_terms_page_id', 0 );
+				return funkycommerce_is_configured_page_or_translation( $page_id, $terms_id );
 			},
 		)
 	);
