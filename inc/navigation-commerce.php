@@ -543,19 +543,6 @@ function funkycommerce_register_navigation_commerce_graphql() {
 	);
 	register_graphql_field(
 		'Page',
-		'isPrivacyPolicyPage',
-		array(
-			'type'        => array( 'non_null' => 'Boolean' ),
-			'description' => 'Whether this page is the WordPress privacy policy page or one of its Polylang translations.',
-			'resolve'     => function ( $source ) {
-				$page_id    = isset( $source->databaseId ) ? (int) $source->databaseId : ( isset( $source->ID ) ? (int) $source->ID : 0 );
-				$privacy_id = (int) get_option( 'wp_page_for_privacy_policy', 0 );
-				return funkycommerce_is_configured_page_or_translation( $page_id, $privacy_id );
-			},
-		)
-	);
-	register_graphql_field(
-		'Page',
 		'isTermsPage',
 		array(
 			'type'        => array( 'non_null' => 'Boolean' ),
