@@ -1509,7 +1509,7 @@ final class FunkyCommerce_Artifact_Renderer {
 				$keys[] = 'page:' . $uri;
 				$keys[] = 'content-page-by-uri:v1:' . $uri;
 			} elseif ( 'product' === $route['object']->post_type ) {
-				$keys[] = 'product:' . $route['path'];
+				$keys[] = 'product:' . $uri;
 				$keys[] = 'product:' . $route['object']->post_name;
 			} else {
 				$keys[] = 'post:' . $uri;
