@@ -267,26 +267,35 @@ class FunkyCommerce_Artifact_REST {
 	 */
 	public static function get_artifact( WP_REST_Request $request ) {
 		$route  = funkycommerce_normalize_artifact_route( $request->get_param( 'route' ) );
-		$locale = (string) $request->get_param( 'locale' );
+		$locale = funkycommerce_normalize_artifact_locale( (string) $request->get_param( 'locale' ) );
 		$shell  = (string) $request->get_param( 'shell' );
 		if ( null === $route ) {
 			return new WP_Error( 'artifact_invalid_route', __( 'Artifact route is invalid.', 'funkycommerce-headless' ), array( 'status' => 400 ) );
+		}
+		if ( null === $locale ) {
+			return new WP_Error( 'artifact_invalid_locale', __( 'Artifact locale is invalid.', 'funkycommerce-headless' ), array( 'status' => 400 ) );
 		}
 		if ( 'public' !== funkycommerce_artifact_route_visibility( $route, array( $locale ) ) ) {
 			return new WP_Error( 'artifact_route_not_public', __( 'This route cannot use the public artifact cache.', 'funkycommerce-headless' ), array( 'status' => 404 ) );
 		}
 
-		$stored = FunkyCommerce_Artifact_Store::get_artifact(
-			array(
-				'siteKey'      => funkycommerce_artifact_site_key(),
-				'locale'       => $locale,
-				'route'        => $route,
-				'shellVersion' => $shell,
-				'variant'      => 'public',
-			)
-		);
+		$stored = null;
+		foreach ( self::artifact_locale_candidates( $locale ) as $candidate_locale ) {
+			$stored = FunkyCommerce_Artifact_Store::get_artifact(
+				array(
+					'siteKey'      => funkycommerce_artifact_site_key(),
+					'locale'       => $candidate_locale,
+					'route'        => $route,
+					'shellVersion' => $shell,
+					'variant'      => 'public',
+				)
+			);
+			if ( ! is_wp_error( $stored ) ) {
+				break;
+			}
+		}
 		if ( is_wp_error( $stored ) ) {
-			return $stored;
+			return self::shell_fallback_response( $route, $shell, $stored );
 		}
 
 		$payload       = $stored['payload'];
@@ -312,6 +321,64 @@ class FunkyCommerce_Artifact_REST {
 		if ( 'failed' === $metadata['state'] || 'stale' === $metadata['state'] ) {
 			$response->header( 'Warning', '110 - "Response is stale"' );
 		}
+		return $response;
+	}
+
+	/**
+	 * Return ordered locale aliases without crossing language boundaries.
+	 *
+	 * @param string $locale Normalized requested locale.
+	 * @return array
+	 */
+	private static function artifact_locale_candidates( $locale ) {
+		$candidates = array( $locale );
+		$parts      = explode( '-', $locale, 2 );
+		$base       = strtolower( $parts[0] );
+		if ( 1 < count( $parts ) ) {
+			$candidates[] = $base;
+		} else {
+			$site_locale = funkycommerce_normalize_artifact_locale( get_locale() );
+			if ( null !== $site_locale && 0 === strpos( strtolower( $site_locale ), $base . '-' ) ) {
+				$candidates[] = $site_locale;
+			}
+		}
+		return array_values( array_unique( $candidates ) );
+	}
+
+	/**
+	 * Assemble the registered React shell when a valid public artifact is unavailable.
+	 *
+	 * @param string   $route Route path.
+	 * @param string   $shell Shell version.
+	 * @param WP_Error $cause Artifact lookup failure.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	private static function shell_fallback_response( $route, $shell, $cause ) {
+		$manifest = FunkyCommerce_Artifact_Store::get_shell( funkycommerce_artifact_site_key(), $shell );
+		if ( is_wp_error( $manifest ) || ! is_string( $manifest['template'] ?? null ) ) {
+			return $cause;
+		}
+		$title = sprintf(
+			/* translators: %s public storefront route. */
+			__( 'Loading %s', 'funkycommerce-headless' ),
+			'/' === $route ? get_bloginfo( 'name' ) : trim( $route, '/' )
+		);
+		$head = '<title>' . esc_html( $title ) . '</title>';
+		$html = str_replace(
+			array(
+				'<!--storefront-artifact-head-->',
+				'<!--storefront-artifact-css-->',
+				'<!--storefront-artifact-content-->',
+				'<!--storefront-artifact-payload-->',
+			),
+			array( $head, '', '', '' ),
+			$manifest['template']
+		);
+		$response = new WP_REST_Response( $html, 200 );
+		$response->header( 'Content-Type', 'text/html; charset=' . get_option( 'blog_charset', 'UTF-8' ) );
+		$response->header( 'Cache-Control', 'public, max-age=0, must-revalidate' );
+		$response->header( 'X-Superfunky-Artifact-State', 'shell-fallback' );
+		$response->header( 'X-Superfunky-Artifact-Miss', sanitize_key( $cause->get_error_code() ) );
 		return $response;
 	}
 
