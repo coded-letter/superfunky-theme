@@ -231,6 +231,8 @@ final class FunkyCommerce_Artifact_Renderer {
 	 * @return array|WP_Error
 	 */
 	private static function resolve_route( $path ) {
+		global $wp_rewrite;
+
 		if ( '/' === $path ) {
 			if ( 'page' === get_option( 'show_on_front' ) && 0 < (int) get_option( 'page_on_front' ) ) {
 				$query = new WP_Query(
@@ -256,7 +258,7 @@ final class FunkyCommerce_Artifact_Renderer {
 			return $singular_route;
 		}
 
-		$rules = wp_rewrite_rules();
+		$rules = $wp_rewrite instanceof WP_Rewrite ? $wp_rewrite->wp_rewrite_rules() : false;
 		if ( ! is_array( $rules ) || empty( $rules ) ) {
 			return new WP_Error( 'artifact_rewrite_rules_unavailable', __( 'WordPress rewrite rules are unavailable.', 'funkycommerce-headless' ), array( 'status' => 503 ) );
 		}
@@ -366,12 +368,16 @@ final class FunkyCommerce_Artifact_Renderer {
 			return null;
 		}
 
+		$type_placeholders = implode( ',', array_fill( 0, count( $post_types ), '%s' ) );
 		$sql = "SELECT ID,post_parent,post_name,post_type,post_status,post_password
 			FROM {$wpdb->posts}
 			WHERE post_name = %s
+				AND post_type IN ({$type_placeholders})
+				AND post_status = 'publish'
+				AND post_password = ''
 			LIMIT 50";
 		$leaf_rows = $wpdb->get_results(
-			$wpdb->prepare( $sql, end( $segments ) ),
+			$wpdb->prepare( $sql, array_merge( array( end( $segments ) ), $post_types ) ),
 			ARRAY_A
 		);
 		if ( ! is_array( $leaf_rows ) || '' !== $wpdb->last_error ) {

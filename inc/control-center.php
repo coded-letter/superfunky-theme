@@ -1485,6 +1485,7 @@ function funkycommerce_render_control_center() {
 							<div><strong><?php esc_html_e( 'Ready', 'funkycommerce-headless' ); ?></strong><span><?php echo esc_html( $artifact_status['counts']['ready'] ); ?></span></div>
 							<div><strong><?php esc_html_e( 'Stale / failed', 'funkycommerce-headless' ); ?></strong><span><?php echo esc_html( $artifact_status['counts']['stale'] . ' / ' . $artifact_status['counts']['failed'] ); ?></span></div>
 							<div><strong><?php esc_html_e( 'Queued / exhausted', 'funkycommerce-headless' ); ?></strong><span><?php echo esc_html( $artifact_status['queue']['queued'] . ' / ' . $artifact_status['queue']['exhausted'] ); ?></span></div>
+							<div><strong><?php esc_html_e( 'Background runner', 'funkycommerce-headless' ); ?></strong><span><?php echo esc_html( function_exists( 'as_schedule_single_action' ) ? __( 'Action Scheduler', 'funkycommerce-headless' ) : __( 'WP-Cron', 'funkycommerce-headless' ) ); ?></span></div>
 							<div><strong><?php esc_html_e( 'Last success', 'funkycommerce-headless' ); ?></strong><span><?php echo esc_html( $artifact_status['lastSuccessAt'] ?: __( 'None', 'funkycommerce-headless' ) ); ?></span></div>
 							<div><strong><?php esc_html_e( 'Storage', 'funkycommerce-headless' ); ?></strong><span class="<?php echo esc_attr( ! empty( $artifact_status['storage']['ok'] ) ? 'fc-active' : 'fc-inactive' ); ?>"><?php echo esc_html( ! empty( $artifact_status['storage']['ok'] ) ? __( 'Healthy', 'funkycommerce-headless' ) : __( 'Unavailable', 'funkycommerce-headless' ) ); ?></span></div>
 						</div>
