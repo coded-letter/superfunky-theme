@@ -298,6 +298,24 @@ final class FunkyCommerce_Artifact_Renderer {
 		}
 		FunkyCommerce_Artifact_Store::record_worker_trace( $path, 'singular-resolving', 0 );
 
+		if ( preg_match( '#^(?:[a-z]{2}(?:-[a-z0-9]+)*/)?blog/([^/]+)$#i', $request, $post_match ) ) {
+			$post = self::find_public_post_by_path( $post_match[1], array( 'post' ) );
+			if (
+				$post instanceof WP_Post
+				&& 'publish' === $post->post_status
+				&& '' === (string) $post->post_password
+				&& $path === self::frontend_post_path( $post )
+			) {
+				return array(
+					'kind'      => 'post',
+					'path'      => $path,
+					'query'     => null,
+					'object'    => $post,
+					'canonical' => self::frontend_url( $path ),
+				);
+			}
+		}
+
 		$post_type_objects = get_post_types( array( 'publicly_queryable' => true ), 'objects' );
 		unset( $post_type_objects['attachment'] );
 		if ( empty( $post_type_objects ) ) {
@@ -310,12 +328,6 @@ final class FunkyCommerce_Artifact_Renderer {
 				'types' => array_keys( $post_type_objects ),
 			),
 		);
-		if ( preg_match( '#^(?:[a-z]{2}(?:-[a-z0-9]+)*/)?blog/([^/]+)$#i', $request, $post_match ) ) {
-			$candidates[] = array(
-				'path'  => $post_match[1],
-				'types' => array( 'post' ),
-			);
-		}
 		foreach ( $post_type_objects as $post_type => $post_type_object ) {
 			$rewrite_slug = is_array( $post_type_object->rewrite ?? null )
 				? trim( (string) ( $post_type_object->rewrite['slug'] ?? '' ), '/' )
