@@ -233,9 +233,32 @@ function funkycommerce_security_mark_content_scripts( $content, $post_type = '' 
 		return $content;
 	}
 
-	$marked = preg_replace(
-		'/<script\b(?![^>]*\bdata-wp-block-html\s*=)([^>]*)>/i',
-		'<script data-wp-block-html="js"$1>',
+	$marked = preg_replace_callback(
+		'/<script\b([^>]*)>/i',
+		static function ( $matches ) {
+			$attributes    = $matches[1];
+			$inert_type    = 'text/funkycommerce-cms';
+			$original_type = '';
+
+			if ( preg_match( '/\s+type\s*=\s*(["\'])(.*?)\1/i', $attributes, $type_match ) ) {
+				$original_type = html_entity_decode( $type_match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				$attributes    = preg_replace( '/\s+type\s*=\s*(["\'])(.*?)\1/i', '', $attributes, 1 );
+				$attributes    = is_string( $attributes ) ? $attributes : $matches[1];
+			}
+
+			if ( ! preg_match( '/\bdata-wp-block-html\s*=/i', $attributes ) ) {
+				$attributes = ' data-wp-block-html="js"' . $attributes;
+			}
+			if (
+				$original_type
+				&& $inert_type !== strtolower( trim( $original_type ) )
+				&& ! preg_match( '/\bdata-wp-block-html-type\s*=/i', $attributes )
+			) {
+				$attributes .= ' data-wp-block-html-type="' . esc_attr( $original_type ) . '"';
+			}
+
+			return '<script type="' . $inert_type . '"' . $attributes . '>';
+		},
 		$content
 	);
 	return is_string( $marked ) ? $marked : $content;
