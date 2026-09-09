@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.24
+Stable tag: 1.2.25
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,12 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.25 highlights ==
+
+* Runs artifact regeneration through WooCommerce Action Scheduler with a native WP-Cron fallback.
+* Prevents broad singular-route lookups from exhausting the artifact worker.
+* Reports the active artifact background runner in the Control Center.
 
 == 1.2.24 highlights ==
 

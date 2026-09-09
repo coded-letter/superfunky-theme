@@ -439,8 +439,8 @@ class FunkyCommerce_Artifact_REST {
 			return $completed;
 		}
 		do_action( 'funkycommerce_artifact_shell_registered', $shell );
-		if ( 0 < $seeded && ! wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT ) ) {
-			wp_schedule_single_event( time() + 1, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+		if ( 0 < $seeded && function_exists( 'funkycommerce_schedule_artifact_worker' ) ) {
+			funkycommerce_schedule_artifact_worker();
 		}
 		return new WP_REST_Response(
 			array_merge(
@@ -575,10 +575,9 @@ class FunkyCommerce_Artifact_REST {
 	private static function schedule_worker( $queued ) {
 		if (
 			0 < (int) $queued
-			&& defined( 'FUNKYCOMMERCE_ARTIFACT_WORK_EVENT' )
-			&& ! wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT )
+			&& function_exists( 'funkycommerce_schedule_artifact_worker' )
 		) {
-			wp_schedule_single_event( time() + 1, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+			funkycommerce_schedule_artifact_worker();
 		}
 	}
 }

@@ -12,6 +12,58 @@ if ( ! defined( 'ABSPATH' ) ) {
 const FUNKYCOMMERCE_ARTIFACT_FLUSH_EVENT = 'funkycommerce_flush_artifact_changes';
 const FUNKYCOMMERCE_ARTIFACT_WORK_EVENT  = 'funkycommerce_process_artifact_jobs';
 const FUNKYCOMMERCE_ARTIFACT_RECONCILE_EVENT = 'funkycommerce_reconcile_artifact_revision';
+const FUNKYCOMMERCE_ARTIFACT_ACTION_GROUP = 'funkycommerce-artifacts';
+
+/**
+ * Whether an artifact worker is already waiting in either supported scheduler.
+ *
+ * @return bool
+ */
+function funkycommerce_artifact_worker_is_scheduled() {
+	if (
+		function_exists( 'as_has_scheduled_action' )
+		&& as_has_scheduled_action( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT, array(), FUNKYCOMMERCE_ARTIFACT_ACTION_GROUP )
+	) {
+		return true;
+	}
+	return (bool) wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+}
+
+/**
+ * Schedule artifact work through Action Scheduler with a WP-Cron fallback.
+ *
+ * WooCommerce's queue runner dispatches asynchronous requests, so normal
+ * installations do not need a server-level cron to keep the queue moving.
+ *
+ * @param int  $delay         Delay in seconds.
+ * @param bool $chain_current Schedule the successor of the currently running worker.
+ * @return bool
+ */
+function funkycommerce_schedule_artifact_worker( $delay = 1, $chain_current = false ) {
+	$delay = max( 0, (int) $delay );
+	if ( ! $chain_current && funkycommerce_artifact_worker_is_scheduled() ) {
+		return true;
+	}
+
+	if ( $delay <= 1 && function_exists( 'as_enqueue_async_action' ) ) {
+		$action_id = as_enqueue_async_action(
+			FUNKYCOMMERCE_ARTIFACT_WORK_EVENT,
+			array(),
+			FUNKYCOMMERCE_ARTIFACT_ACTION_GROUP,
+			! $chain_current
+		);
+	} elseif ( function_exists( 'as_schedule_single_action' ) ) {
+		$action_id = as_schedule_single_action( time() + $delay, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT, array(), FUNKYCOMMERCE_ARTIFACT_ACTION_GROUP, ! $chain_current );
+	} else {
+		return wp_schedule_single_event( time() + $delay, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+	}
+	if ( 0 < (int) $action_id ) {
+		return true;
+	}
+
+	error_log( 'FunkyCommerce artifact worker could not be queued through Action Scheduler.' );
+	return false;
+}
 
 /**
  * Whether typed artifact invalidation is enabled.
@@ -313,8 +365,8 @@ function funkycommerce_flush_artifact_changes() {
 		wp_schedule_single_event( time() + MINUTE_IN_SECONDS, FUNKYCOMMERCE_ARTIFACT_FLUSH_EVENT );
 		return;
 	}
-	if ( 0 < $flushed['affected'] && has_filter( 'funkycommerce_generate_route_artifact' ) && ! wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT ) ) {
-		wp_schedule_single_event( time() + 1, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+	if ( 0 < $flushed['affected'] && has_filter( 'funkycommerce_generate_route_artifact' ) ) {
+		funkycommerce_schedule_artifact_worker();
 	}
 	do_action( 'funkycommerce_artifact_changes_flushed', $flushed );
 }
@@ -332,12 +384,12 @@ function funkycommerce_process_artifact_jobs() {
 	$lease_key = 'queue-worker:' . funkycommerce_artifact_site_key();
 	$lease     = FunkyCommerce_Artifact_Store::acquire_lease( $lease_key, 'queue-worker', 120 );
 	if ( is_wp_error( $lease ) ) {
-		if ( 'artifact_lease_conflict' !== $lease->get_error_code() ) {
-			error_log( 'FunkyCommerce artifact worker lease failed: ' . $lease->get_error_code() );
+		if ( 'artifact_lease_conflict' === $lease->get_error_code() ) {
+			funkycommerce_schedule_artifact_worker( MINUTE_IN_SECONDS, true );
+			return;
 		}
-		if ( ! wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT ) ) {
-			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
-		}
+		error_log( 'FunkyCommerce artifact worker lease failed: ' . $lease->get_error_code() );
+		funkycommerce_schedule_artifact_worker( MINUTE_IN_SECONDS, true );
 		return;
 	}
 
@@ -345,7 +397,7 @@ function funkycommerce_process_artifact_jobs() {
 		$jobs = FunkyCommerce_Artifact_Store::claim_regeneration_jobs( 1 );
 		if ( is_wp_error( $jobs ) ) {
 			error_log( 'FunkyCommerce artifact queue failed: ' . $jobs->get_error_code() );
-			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+			funkycommerce_schedule_artifact_worker( MINUTE_IN_SECONDS, true );
 			return;
 		}
 		foreach ( $jobs as $job ) {
@@ -385,11 +437,11 @@ function funkycommerce_process_artifact_jobs() {
 		$due = FunkyCommerce_Artifact_Store::has_due_regeneration_jobs();
 		if ( is_wp_error( $due ) ) {
 			error_log( 'FunkyCommerce artifact queue check failed: ' . $due->get_error_code() );
-			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+			funkycommerce_schedule_artifact_worker( MINUTE_IN_SECONDS, true );
 			return;
 		}
-		if ( $due && ! wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT ) ) {
-			wp_schedule_single_event( time() + 1, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+		if ( $due ) {
+			funkycommerce_schedule_artifact_worker( 1, true );
 		}
 	} finally {
 		FunkyCommerce_Artifact_Store::release_lease( $lease_key, $lease );
@@ -403,7 +455,7 @@ add_action( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT, 'funkycommerce_process_artifact_j
  * @return void
  */
 function funkycommerce_ensure_artifact_worker() {
-	if ( ! funkycommerce_artifact_invalidation_enabled() || ! has_filter( 'funkycommerce_generate_route_artifact' ) || wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT ) ) {
+	if ( ! funkycommerce_artifact_invalidation_enabled() || ! has_filter( 'funkycommerce_generate_route_artifact' ) || funkycommerce_artifact_worker_is_scheduled() ) {
 		return;
 	}
 	$due = FunkyCommerce_Artifact_Store::has_due_regeneration_jobs();
@@ -412,7 +464,7 @@ function funkycommerce_ensure_artifact_worker() {
 		return;
 	}
 	if ( $due ) {
-		wp_schedule_single_event( time() + MINUTE_IN_SECONDS, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+		funkycommerce_schedule_artifact_worker( MINUTE_IN_SECONDS );
 	}
 }
 add_action( 'init', 'funkycommerce_ensure_artifact_worker', 40 );
@@ -465,8 +517,8 @@ function funkycommerce_reconcile_artifact_revision() {
 		error_log( 'FunkyCommerce artifact reconciliation failed: ' . $reconciled->get_error_code() );
 		return;
 	}
-	if ( 0 < $reconciled['affected'] && has_filter( 'funkycommerce_generate_route_artifact' ) && ! wp_next_scheduled( FUNKYCOMMERCE_ARTIFACT_WORK_EVENT ) ) {
-		wp_schedule_single_event( time() + 1, FUNKYCOMMERCE_ARTIFACT_WORK_EVENT );
+	if ( 0 < $reconciled['affected'] && has_filter( 'funkycommerce_generate_route_artifact' ) ) {
+		funkycommerce_schedule_artifact_worker();
 	}
 }
 add_action( FUNKYCOMMERCE_ARTIFACT_RECONCILE_EVENT, 'funkycommerce_reconcile_artifact_revision' );
