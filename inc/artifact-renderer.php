@@ -310,6 +310,12 @@ final class FunkyCommerce_Artifact_Renderer {
 				'types' => array_keys( $post_type_objects ),
 			),
 		);
+		if ( preg_match( '#^(?:[a-z]{2}(?:-[a-z0-9]+)*/)?blog/([^/]+)$#i', $request, $post_match ) ) {
+			$candidates[] = array(
+				'path'  => $post_match[1],
+				'types' => array( 'post' ),
+			);
+		}
 		foreach ( $post_type_objects as $post_type => $post_type_object ) {
 			$rewrite_slug = is_array( $post_type_object->rewrite ?? null )
 				? trim( (string) ( $post_type_object->rewrite['slug'] ?? '' ), '/' )
@@ -334,7 +340,9 @@ final class FunkyCommerce_Artifact_Renderer {
 				continue;
 			}
 			FunkyCommerce_Artifact_Store::record_worker_trace( $path, 'singular-found', 0 );
-			$canonical_path = self::path_from_url( self::frontend_url_for_backend_url( get_permalink( $post ) ) );
+			$canonical_path = 'post' === $post->post_type
+				? self::frontend_post_path( $post )
+				: self::path_from_url( self::frontend_url_for_backend_url( get_permalink( $post ) ) );
 			if ( $path !== $canonical_path ) {
 				continue;
 			}
@@ -1508,11 +1516,6 @@ final class FunkyCommerce_Artifact_Renderer {
 			if ( 'page' === $route['object']->post_type ) {
 				$keys[] = 'page:' . $uri;
 				$keys[] = 'content-page-by-uri:v1:' . $uri;
-			} elseif ( 'product' === $route['object']->post_type ) {
-				$keys[] = 'product:' . $uri;
-				$keys[] = 'product:' . $route['object']->post_name;
-			} else {
-				$keys[] = 'post:' . $uri;
 			}
 
 		}
@@ -1525,6 +1528,19 @@ final class FunkyCommerce_Artifact_Renderer {
 			);
 		}
 		return $entries;
+	}
+
+	/**
+	 * Return the canonical storefront path for a WordPress post.
+	 *
+	 * @param WP_Post $post Post.
+	 * @return string|null
+	 */
+	private static function frontend_post_path( $post ) {
+		$language         = function_exists( 'pll_get_post_language' ) ? strtolower( (string) pll_get_post_language( $post->ID, 'slug' ) ) : '';
+		$default_language = function_exists( 'pll_default_language' ) ? strtolower( (string) pll_default_language( 'slug' ) ) : '';
+		$prefix           = $language && $default_language && $language !== $default_language ? '/' . $language : '';
+		return funkycommerce_normalize_artifact_route( $prefix . '/blog/' . $post->post_name );
 	}
 
 	/**
