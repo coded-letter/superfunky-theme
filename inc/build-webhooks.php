@@ -77,13 +77,13 @@ add_action( 'graphql_register_types', 'funkycommerce_register_static_generation_
  */
 function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
 	if ( ! funkycommerce_is_headless_mode() ) {
-		return;
+		return false;
 	}
 	$settings    = funkycommerce_control_center_settings();
 	$webhook_url = $settings['build_webhook_url'] ?? '';
 
 	if ( empty( $webhook_url ) ) {
-		return;
+		return false;
 	}
 
 	$response = wp_safe_remote_post(
@@ -114,7 +114,7 @@ function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
 			),
 			admin_url( 'themes.php?page=funkycommerce-control-center' )
 		);
-		return;
+		return false;
 	}
 
 	$status = wp_remote_retrieve_response_code( $response );
@@ -130,9 +130,97 @@ function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
 			),
 			admin_url( 'themes.php?page=funkycommerce-control-center' )
 		);
+		return false;
 	}
+	return true;
 }
 add_action( FUNKYCOMMERCE_BUILD_EVENT, 'funkycommerce_trigger_storefront_build' );
+
+/**
+ * Add a manual storefront rebuild action and optional Netlify status badge.
+ *
+ * @param WP_Admin_Bar $admin_bar Admin toolbar.
+ */
+function funkycommerce_build_admin_bar( $admin_bar ) {
+	if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	$settings    = funkycommerce_control_center_settings();
+	$webhook_url = trim( (string) ( $settings['build_webhook_url'] ?? '' ) );
+	if ( '' === $webhook_url ) {
+		return;
+	}
+
+	$admin_bar->add_node(
+		array(
+			'id'    => 'funkycommerce-storefront-build',
+			'title' => __( 'Rebuild storefront', 'funkycommerce-headless' ),
+			'href'  => wp_nonce_url(
+				admin_url( 'admin-post.php?action=funkycommerce_manual_storefront_build' ),
+				'funkycommerce_manual_storefront_build'
+			),
+			'meta'  => array(
+				'title' => __( 'Publish current WordPress content to the static storefront', 'funkycommerce-headless' ),
+			),
+		)
+	);
+
+	$site_id = trim( (string) ( $settings['build_badge_id'] ?? '' ) );
+	if ( '' === $site_id ) {
+		return;
+	}
+	$admin_bar->add_node(
+		array(
+			'id'     => 'funkycommerce-storefront-build-status',
+			'parent' => 'funkycommerce-storefront-build',
+			'title'  => '<img src="' . esc_url( 'https://api.netlify.com/api/v1/badges/' . rawurlencode( $site_id ) . '/deploy-status' ) . '" alt="' . esc_attr__( 'Netlify deploy status', 'funkycommerce-headless' ) . '" style="display:block;height:20px;margin:6px 8px 0 0;width:auto">',
+			'href'   => 'https://app.netlify.com/sites/' . rawurlencode( $site_id ) . '/deploys',
+			'meta'   => array(
+				'html'   => true,
+				'target' => '_blank',
+				'rel'    => 'noopener noreferrer',
+				'title'  => __( 'Open Netlify deploys', 'funkycommerce-headless' ),
+			),
+		)
+	);
+}
+add_action( 'admin_bar_menu', 'funkycommerce_build_admin_bar', 90 );
+
+/**
+ * Handle the explicit administrator rebuild request.
+ */
+function funkycommerce_handle_manual_storefront_build() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'You do not have permission to rebuild the storefront.', 'funkycommerce-headless' ), 403 );
+	}
+	check_admin_referer( 'funkycommerce_manual_storefront_build' );
+	$requested = funkycommerce_trigger_storefront_build( 'manual_admin_bar' );
+	wp_safe_redirect(
+		add_query_arg(
+			'funkycommerce_build_requested',
+			$requested ? '1' : '0',
+			wp_get_referer() ?: admin_url()
+		)
+	);
+	exit;
+}
+add_action( 'admin_post_funkycommerce_manual_storefront_build', 'funkycommerce_handle_manual_storefront_build' );
+
+/**
+ * Confirm a manual build request in wp-admin.
+ */
+function funkycommerce_manual_storefront_build_notice() {
+	if ( ! current_user_can( 'manage_options' ) || ! isset( $_GET['funkycommerce_build_requested'] ) ) {
+		return;
+	}
+	$requested = '1' === sanitize_key( wp_unslash( $_GET['funkycommerce_build_requested'] ) );
+	$class     = $requested ? 'notice-success' : 'notice-error';
+	$message   = $requested
+		? __( 'Storefront rebuild requested. Netlify will publish the updated static content when the build completes.', 'funkycommerce-headless' )
+		: __( 'The storefront rebuild could not be requested. Check the build webhook configuration and notifications.', 'funkycommerce-headless' );
+	echo '<div class="notice ' . esc_attr( $class ) . ' is-dismissible"><p>' . esc_html( $message ) . '</p></div>';
+}
+add_action( 'admin_notices', 'funkycommerce_manual_storefront_build_notice' );
 
 /**
  * Preserve the content-change reason while keeping the debounce event argument-free.
