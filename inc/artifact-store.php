@@ -507,6 +507,19 @@ class FunkyCommerce_Artifact_Store {
 			self::delete_payload_if_unreferenced( $body['path'] );
 			return new WP_Error( 'artifact_shell_store_failed', __( 'Shell metadata could not be stored.', 'funkycommerce-headless' ), array( 'status' => 500 ) );
 		}
+		$discarded_jobs = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$tables['jobs']} WHERE site_key = %s AND shell_version <> %s",
+				$shell['siteKey'],
+				$shell['shellVersion']
+			)
+		);
+		if ( false === $discarded_jobs ) {
+			$wpdb->query( 'ROLLBACK' );
+			self::release_lease( 'shell:' . $shell['siteKey'], $lease );
+			self::delete_payload_if_unreferenced( $body['path'] );
+			return new WP_Error( 'artifact_shell_store_failed', __( 'Obsolete artifact work could not be discarded.', 'funkycommerce-headless' ), array( 'status' => 500 ) );
+		}
 		$result = $wpdb->query(
 			$wpdb->prepare(
 				"INSERT INTO {$tables['shells']}
