@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.32' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.33' );
 
 /**
  * Whether Superfunky Pro is active and licensed.

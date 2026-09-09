@@ -1435,6 +1435,26 @@ function funkycommerce_render_control_center() {
 						<?php settings_fields( 'funkycommerce_control_center' ); ?>
 						<section class="fc-panel">
 							<div class="fc-panel-heading"><div><h2><?php echo esc_html( $section['title'] ); ?></h2><p><?php echo esc_html( $section['description'] ); ?></p></div><span><?php echo esc_html( count( $section['fields'] ) ); ?> <?php esc_html_e( 'controls', 'funkycommerce-headless' ); ?></span></div>
+							<?php if ( 'build' === $section_key ) : ?>
+								<div class="fc-operator-guide">
+									<h3><?php esc_html_e( 'Static-first SSG rollout', 'funkycommerce-headless' ); ?></h3>
+									<p><?php esc_html_e( 'Use this mode when the static host should serve complete generated HTML immediately, while WordPress remains the content source and artifact control plane.', 'funkycommerce-headless' ); ?></p>
+									<ol>
+										<li><?php esc_html_e( 'Set Frontend URL, a unique Artifact site key, and the same 32+ character signing secret in WordPress and the storefront deployment.', 'funkycommerce-headless' ); ?></li>
+										<li><?php esc_html_e( 'Validate generation in shadow mode. Confirm the Artifacts panel reports a healthy active shell, background runner, and no failed or exhausted current-shell jobs.', 'funkycommerce-headless' ); ?></li>
+										<li><?php esc_html_e( 'Set Dynamic content delivery to Serve generated artifacts and configure the storefront variables shown below.', 'funkycommerce-headless' ); ?></li>
+										<li><?php esc_html_e( 'Configure a build webhook. After editing content, use Rebuild storefront in the top admin bar and wait for the deployment badge to succeed.', 'funkycommerce-headless' ); ?></li>
+									</ol>
+									<pre><code>STOREFRONT_ARTIFACT_MODE=artifact
+STOREFRONT_ARTIFACT_DELIVERY=static-first
+STOREFRONT_ARTIFACT_ORIGIN=<?php echo esc_html( untrailingslashit( home_url( '/' ) ) ); ?>
+STOREFRONT_ARTIFACT_SITE_KEY=<?php echo esc_html( $settings['artifact_site_key'] ?: 'unique-site-key' ); ?>
+STOREFRONT_ARTIFACT_SIGNING_SECRET=&lt;same-secret-as-wordpress&gt;
+VITE_ARTIFACT_ROUTE_HYDRATION=true</code></pre>
+									<p><strong><?php esc_html_e( 'Freshness:', 'funkycommerce-headless' ); ?></strong> <?php esc_html_e( 'WordPress collects changes and regenerates artifacts automatically, but static-first public HTML changes only after a storefront build. Until then, visitors keep the previous known-good deployment.', 'funkycommerce-headless' ); ?></p>
+									<p><strong><?php esc_html_e( 'Rollback:', 'funkycommerce-headless' ); ?></strong> <?php esc_html_e( 'Restore the previous static deployment or set STOREFRONT_ARTIFACT_DELIVERY=proxy and rebuild. Never reuse one artifact site key across public sites.', 'funkycommerce-headless' ); ?></p>
+								</div>
+							<?php endif; ?>
 							<?php if ( ! empty( $section['preview'] ) ) : ?>
 								<div class="fc-layout-preview" data-layout-preview style="--preview-width:<?php echo esc_attr( $settings['layout_theme_max_width_px'] ?? '1280' ); ?>px;--preview-radius:<?php echo esc_attr( $settings['layout_theme_radius_px'] ?? '16' ); ?>px">
 									<div class="fc-layout-preview-toolbar"><strong><?php esc_html_e( 'Control Center preview', 'funkycommerce-headless' ); ?></strong><span><?php esc_html_e( 'Updates as controls change; the storefront remains canonical.', 'funkycommerce-headless' ); ?></span></div>
@@ -1533,6 +1553,10 @@ function funkycommerce_render_control_center() {
 		.fc-panel-heading { align-items: start; background: #fafafa; border-bottom: 1px solid #e7e7e9; display: flex; justify-content: space-between; padding: 20px 24px; }
 		.fc-panel-heading h2 { font-size: 21px; margin: 0 0 5px; } .fc-panel-heading p { color: #646970; margin: 0; }
 		.fc-panel-heading > span { background: #ede9fe; border-radius: 999px; color: #5b21b6; font-size: 11px; font-weight: 700; padding: 5px 9px; white-space: nowrap; }
+		.fc-operator-guide { background:#f6f7f7; border-bottom:1px solid #dcdcde; padding:18px 24px; }
+		.fc-operator-guide h3 { margin:0 0 8px; }
+		.fc-operator-guide ol { margin-left:20px; }
+		.fc-operator-guide pre { background:#1d2327; border-radius:6px; color:#f0f0f1; overflow:auto; padding:14px; }
 		.fc-layout-preview { background:#f4f4f5; border-bottom:1px solid var(--fc-border); padding:18px 24px; }
 		.fc-layout-preview-toolbar { align-items:center; display:flex; justify-content:space-between; margin-bottom:10px; }
 		.fc-layout-preview-toolbar span { color:#646970; font-size:12px; }
