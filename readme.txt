@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.32
+Stable tag: 1.2.33
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,46 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.33 highlights ==
+
+* Documents the portable static-first SSG rollout and rollback workflow in Build & Deploy.
+* Explains explicit admin-bar publishing, artifact freshness, per-site keys, and required storefront variables.
+
+== Static-first SSG setup ==
+
+Static-first delivery keeps WordPress as the content and artifact control plane while the
+frontend host serves complete generated route documents. It is portable across static hosts;
+the examples below use environment-variable names from the Superfunky storefront.
+
+1. Configure the public Frontend URL in Build & Deploy.
+2. Create a unique Artifact site key for this public site. Never share a key between sites.
+3. Generate a random signing secret of at least 32 characters. Save the exact same value in
+   WordPress and the frontend deployment environment.
+4. Start with Generate artifacts in shadow mode. Confirm the Artifacts panel shows a healthy
+   active shell, a working Action Scheduler or WP-Cron runner, and no failed/exhausted jobs
+   for the current shell.
+5. Switch Dynamic content delivery to Serve generated artifacts.
+6. Configure the frontend deployment:
+
+   STOREFRONT_ARTIFACT_MODE=artifact
+   STOREFRONT_ARTIFACT_DELIVERY=static-first
+   STOREFRONT_ARTIFACT_ORIGIN=https://wordpress.example.com
+   STOREFRONT_ARTIFACT_SITE_KEY=unique-site-key
+   STOREFRONT_ARTIFACT_SIGNING_SECRET=same-secret-as-wordpress
+   VITE_ARTIFACT_ROUTE_HYDRATION=true
+
+7. Configure the host build webhook in WordPress. Netlify users may also enter the Netlify
+   site ID as Build status badge ID.
+8. Edit and preview content in WordPress. When ready to publish, click Rebuild storefront in
+   the top admin bar. Wait for the deploy badge to succeed before testing the public site.
+
+WordPress invalidation and artifact regeneration happen automatically, but they do not replace
+static-first public HTML. A storefront build is the explicit publish boundary. Until that build
+finishes, visitors continue receiving the previous known-good static deployment.
+
+To roll back, restore the previous static-host deployment. To return to proxy delivery, set
+STOREFRONT_ARTIFACT_DELIVERY=proxy and rebuild the storefront.
 
 == 1.2.32 highlights ==
 
