@@ -57,6 +57,47 @@ function funkycommerce_available_language_slugs() {
 	return array_values( array_filter( array_map( 'sanitize_key', (array) pll_languages_list( array( 'fields' => 'slug' ) ) ) ) );
 }
 
+/**
+ * Resolve an author's public biography for a storefront language.
+ *
+ * Polylang string translations are used when available. The filter lets other
+ * multilingual providers supply the same value without changing the API.
+ */
+function funkycommerce_localized_author_description( $user_id, $language = '' ) {
+	$language    = funkycommerce_normalize_content_language( $language );
+	$description = trim( (string) get_the_author_meta( 'description', (int) $user_id ) );
+	if ( '' !== $description && function_exists( 'pll_translate_string' ) ) {
+		$description = (string) pll_translate_string( $description, $language );
+	}
+
+	return trim( (string) apply_filters( 'funkycommerce_localized_author_description', $description, (int) $user_id, $language ) );
+}
+
+/**
+ * Expose the localized author biography to headless storefronts.
+ */
+function funkycommerce_register_localized_author_graphql_field() {
+	if ( ! function_exists( 'register_graphql_field' ) ) {
+		return;
+	}
+	register_graphql_field(
+		'User',
+		'storefrontDescription',
+		array(
+			'type'        => 'String',
+			'description' => __( 'Public author biography translated for the requested storefront language.', 'funkycommerce-headless' ),
+			'args'        => array(
+				'language' => array( 'type' => array( 'non_null' => 'String' ) ),
+			),
+			'resolve'     => function ( $source, $args ) {
+				$user_id = absint( $source->databaseId ?? $source->userId ?? $source->ID ?? 0 );
+				return $user_id ? funkycommerce_localized_author_description( $user_id, $args['language'] ?? '' ) : '';
+			},
+		)
+	);
+}
+add_action( 'graphql_register_types', 'funkycommerce_register_localized_author_graphql_field' );
+
 function funkycommerce_default_content_language() {
 	$settings = funkycommerce_content_language_settings();
 	$languages = funkycommerce_available_language_slugs();

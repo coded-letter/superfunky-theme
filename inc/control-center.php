@@ -1298,7 +1298,7 @@ function funkycommerce_render_extensions() {
 					<div class="fc-extension-actions">
 						<strong class="<?php echo esc_attr( $active ? 'fc-active' : 'fc-inactive' ); ?>"><?php echo esc_html( $active ? __( 'Plugin active', 'funkycommerce-headless' ) : __( 'Plugin slot ready', 'funkycommerce-headless' ) ); ?></strong>
 						<?php if ( $active && $settings_url && $entitlement['licensed'] ) : ?><a class="button button-secondary" href="<?php echo esc_url( $settings_url ); ?>"><?php esc_html_e( 'Configure', 'funkycommerce-headless' ); ?></a><?php endif; ?>
-						<?php if ( ! $entitlement['licensed'] && ! empty( $companion['product_url'] ) ) : ?><a class="button button-primary" href="<?php echo esc_url( $companion['product_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View product', 'funkycommerce-headless' ); ?></a><?php endif; ?>
+						<?php if ( ( ! $active || ! $entitlement['licensed'] ) && ! empty( $companion['product_url'] ) ) : ?><a class="button button-primary" href="<?php echo esc_url( $companion['product_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View product', 'funkycommerce-headless' ); ?></a><?php endif; ?>
 					</div>
 					<?php do_action( 'funkycommerce_premium_companion_card', $companion['key'], $companion, $entitlement ); ?>
 				</article>
@@ -1382,6 +1382,7 @@ function funkycommerce_render_control_center() {
 	$form_count = function_exists( 'funkycommerce_submission_count' ) ? funkycommerce_submission_count( 'fc_form_entry', 'unread' ) : 0;
 	$headless_login_active = funkycommerce_headless_login_is_active();
 	$wpgraphql_polylang_active = funkycommerce_wpgraphql_polylang_is_active();
+	$superfunky_pro_active = funkycommerce_extension_is_active( array( 'superfunky-pro', 'funkycommerce-pro' ) );
 	?>
 	<div class="wrap fc-control-center">
 		<?php settings_errors( 'funkycommerce_control_center' ); ?>
@@ -1419,6 +1420,7 @@ function funkycommerce_render_control_center() {
 			<div><strong><?php esc_html_e( 'Runtime coverage', 'funkycommerce-headless' ); ?></strong><span class="fc-active"><?php echo esc_html( $coverage['live'] ); ?> <?php esc_html_e( 'live', 'funkycommerce-headless' ); ?></span></div>
 			<div><strong><?php esc_html_e( 'Newsletter inbox', 'funkycommerce-headless' ); ?></strong><a href="<?php echo esc_url( add_query_arg( 'page', 'funkycommerce-newsletter-submissions', admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $newsletter_count ); ?> <?php esc_html_e( 'unread', 'funkycommerce-headless' ); ?></a></div>
 			<div><strong><?php esc_html_e( 'Form inbox', 'funkycommerce-headless' ); ?></strong><a href="<?php echo esc_url( add_query_arg( 'page', 'funkycommerce-form-submissions', admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $form_count ); ?> <?php esc_html_e( 'unread', 'funkycommerce-headless' ); ?></a></div>
+			<div><strong><?php esc_html_e( 'Superfunky Pro', 'funkycommerce-headless' ); ?></strong><?php if ( $superfunky_pro_active ) : ?><span class="fc-active"><?php esc_html_e( 'Connected', 'funkycommerce-headless' ); ?></span><?php else : ?><a class="fc-inactive" href="https://codedletter.com/products/theme-pro/" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Get Pro', 'funkycommerce-headless' ); ?></a><?php endif; ?></div>
 		</div>
 
 		<div class="fc-workspace">
@@ -1534,10 +1536,10 @@ VITE_ARTIFACT_ROUTE_HYDRATION=true</code></pre>
 	</div>
 	<style>
 		.fc-control-center { --fc-accent: #6d28d9; --fc-border: #e4e4e7; max-width: 1440px; }
-		.fc-hero { align-items: center; background: radial-gradient(circle at 78% 10%, rgba(167,139,250,.45), transparent 28%), linear-gradient(135deg, #18181b, #312e81 58%, #5b21b6); border: 1px solid rgba(255,255,255,.12); border-radius: 20px; box-shadow: 0 18px 45px rgba(49,46,129,.18); color: #fff; display: flex; justify-content: space-between; margin: 20px 0 18px; padding: 30px 34px; }
-		.fc-hero h1 { color: #fff; font-size: 32px; letter-spacing: -.02em; margin: 4px 0 8px; }
-		.fc-hero p { color: #d4d4d8; margin: 0; max-width: 760px; }
-		.fc-eyebrow { color: #c4b5fd; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+		.fc-control-center .fc-hero { align-items: center; background: radial-gradient(circle at 78% 10%, rgba(167,139,250,.45), transparent 28%), linear-gradient(135deg, #18181b, #312e81 58%, #5b21b6); border: 1px solid rgba(255,255,255,.12); border-radius: 20px; box-shadow: 0 18px 45px rgba(49,46,129,.18); color: #fff !important; display: flex; justify-content: space-between; margin: 20px 0 18px; padding: 30px 34px; -webkit-text-fill-color: #fff; }
+		.fc-control-center .fc-hero h1 { color: #fff !important; font-size: 32px; letter-spacing: -.02em; margin: 4px 0 8px; -webkit-text-fill-color: #fff; }
+		.fc-control-center .fc-hero p { color: #e4e4e7 !important; margin: 0; max-width: 760px; -webkit-text-fill-color: #e4e4e7; }
+		.fc-control-center .fc-hero .fc-eyebrow { color: #ddd6fe !important; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; -webkit-text-fill-color: #ddd6fe; }
 		.fc-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-left: 24px; }
 		.fc-hero-actions .button { align-items: center; border-color: rgba(255,255,255,.25); display: inline-flex; min-height: 36px; }
 		.fc-hero-actions .button-secondary { background: rgba(255,255,255,.08); color: #fff; }
