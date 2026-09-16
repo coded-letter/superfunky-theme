@@ -307,7 +307,10 @@ function funkycommerce_collect_control_center_change( $old_value, $new_value ) {
 		'artifact_cache_ttl',
 		'artifact_retention_days',
 		'build_webhook_url',
+		'build_provider',
 		'build_badge_id',
+		'build_status_badge_url',
+		'build_dashboard_url',
 		'periodic_rebuild',
 		'rebuild_interval',
 	);

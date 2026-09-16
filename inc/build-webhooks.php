@@ -25,7 +25,10 @@ function funkycommerce_static_generation_config() {
 
 	return array(
 		'frontendUrl'            => (string) ( $settings['frontend_url'] ?? '' ),
+		'buildProvider'          => (string) ( $settings['build_provider'] ?? 'netlify' ),
 		'buildBadgeId'           => (string) ( $settings['build_badge_id'] ?? '' ),
+		'buildStatusBadgeUrl'    => (string) ( $settings['build_status_badge_url'] ?? '' ),
+		'buildDashboardUrl'      => (string) ( $settings['build_dashboard_url'] ?? '' ),
 		'sitemapEnabled'         => 'no' !== ( $settings['sitemap_enabled'] ?? 'yes' ),
 		'robotsEnabled'          => 'no' !== ( $settings['robots_enabled'] ?? 'yes' ),
 		'robotsTxt'              => (string) ( $settings['robots_txt'] ?? '' ),
@@ -137,7 +140,7 @@ function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
 add_action( FUNKYCOMMERCE_BUILD_EVENT, 'funkycommerce_trigger_storefront_build' );
 
 /**
- * Add a manual storefront rebuild action and optional Netlify status badge.
+ * Add a manual storefront rebuild action and optional deployment status badge.
  *
  * @param WP_Admin_Bar $admin_bar Admin toolbar.
  */
@@ -147,19 +150,27 @@ function funkycommerce_build_admin_bar( $admin_bar ) {
 	}
 	$settings    = funkycommerce_control_center_settings();
 	$webhook_url = trim( (string) ( $settings['build_webhook_url'] ?? '' ) );
+	$provider    = 'cloudflare-pages' === ( $settings['build_provider'] ?? 'netlify' ) ? 'cloudflare-pages' : 'netlify';
 	$site_id     = trim( (string) ( $settings['build_badge_id'] ?? '' ) );
-	if ( '' === $site_id ) {
+	$badge_url   = 'cloudflare-pages' === $provider
+		? trim( (string) ( $settings['build_status_badge_url'] ?? '' ) )
+		: ( '' !== $site_id ? 'https://api.netlify.com/api/v1/badges/' . rawurlencode( $site_id ) . '/deploy-status' : '' );
+	if ( '' === $badge_url ) {
 		return;
+	}
+	$provider_name = 'cloudflare-pages' === $provider ? __( 'Cloudflare Pages', 'funkycommerce-headless' ) : __( 'Netlify', 'funkycommerce-headless' );
+	$dashboard_url = trim( (string) ( $settings['build_dashboard_url'] ?? '' ) );
+	if ( '' === $dashboard_url ) {
+		$dashboard_url = 'cloudflare-pages' === $provider ? 'https://dash.cloudflare.com/' : 'https://app.netlify.com/';
 	}
 
 	$admin_bar->add_node(
 		array(
 			'id'    => 'funkycommerce-storefront-build-status',
-			'title' => '<img id="netlify-admin-badge" src="' . esc_url( 'https://api.netlify.com/api/v1/badges/' . rawurlencode( $site_id ) . '/deploy-status' ) . '" alt="' . esc_attr__( 'Netlify deploy status', 'funkycommerce-headless' ) . '" style="height:20px;vertical-align:middle;cursor:pointer">',
+			'title' => '<img id="funkycommerce-build-status-badge" src="' . esc_url( $badge_url ) . '" alt="' . esc_attr( sprintf( __( '%s deploy status', 'funkycommerce-headless' ), $provider_name ) ) . '" style="height:20px;vertical-align:middle;cursor:pointer">',
 			'href'  => admin_url( 'themes.php?page=funkycommerce-control-center' ),
 			'meta'  => array(
 				'class' => 'menupop',
-				'html'  => true,
 				'title' => __( 'Open storefront build settings', 'funkycommerce-headless' ),
 			),
 		)
@@ -184,14 +195,14 @@ function funkycommerce_build_admin_bar( $admin_bar ) {
 
 	$admin_bar->add_node(
 		array(
-			'id'     => 'funkycommerce-storefront-netlify-dashboard',
+			'id'     => 'funkycommerce-storefront-deployment-dashboard',
 			'parent' => 'funkycommerce-storefront-build-status',
-			'title'  => __( 'Netlify dashboard', 'funkycommerce-headless' ),
-			'href'   => 'https://app.netlify.com',
+			'title'  => sprintf( __( '%s dashboard', 'funkycommerce-headless' ), $provider_name ),
+			'href'   => $dashboard_url,
 			'meta'   => array(
 				'target' => '_blank',
 				'rel'    => 'noopener noreferrer',
-				'title'  => __( 'Open Netlify dashboard', 'funkycommerce-headless' ),
+				'title'  => sprintf( __( 'Open %s dashboard', 'funkycommerce-headless' ), $provider_name ),
 			),
 		)
 	);
@@ -199,27 +210,27 @@ function funkycommerce_build_admin_bar( $admin_bar ) {
 add_action( 'admin_bar_menu', 'funkycommerce_build_admin_bar', 1000 );
 
 /**
- * Match the legacy top-level Netlify badge spacing and keep its status fresh.
+ * Match the legacy top-level badge spacing and keep its status fresh.
  */
 function funkycommerce_build_admin_bar_assets() {
 	if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) ) {
 		return;
 	}
-	?>
-	<style>#netlify-admin-badge{padding:0 8px}</style>
-	<script>
-		window.addEventListener("DOMContentLoaded", function () {
-			var badge = document.getElementById("netlify-admin-badge");
+	wp_enqueue_script( 'jquery' );
+	wp_add_inline_style( 'admin-bar', '#funkycommerce-build-status-badge{padding:0 8px}' );
+	wp_add_inline_script(
+		'jquery',
+		'window.addEventListener("DOMContentLoaded", function () {
+			var badge = document.getElementById("funkycommerce-build-status-badge");
 			if (!badge) return;
 			window.setInterval(function () {
 				badge.src = badge.src.split("?")[0] + "?t=" + Date.now();
 			}, 60000);
-		});
-	</script>
-	<?php
+		});'
+	);
 }
-add_action( 'admin_footer', 'funkycommerce_build_admin_bar_assets' );
-add_action( 'wp_footer', 'funkycommerce_build_admin_bar_assets' );
+add_action( 'admin_enqueue_scripts', 'funkycommerce_build_admin_bar_assets' );
+add_action( 'wp_enqueue_scripts', 'funkycommerce_build_admin_bar_assets' );
 
 /**
  * Handle the explicit administrator rebuild request.
