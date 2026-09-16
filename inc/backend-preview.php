@@ -90,8 +90,9 @@ function funkycommerce_backend_preview_authorized() {
 
 /**
  * Whether the current request must be exempt from both the preview guard and
- * the public redirect: WordPress admin, login, REST, GraphQL, cron, feeds, and
- * the theme's own SEO/AI document and merchant-feed routes.
+ * the public redirect: WordPress admin, login, REST, GraphQL, cron, feeds,
+ * media/conversion requests, and the theme's own SEO/AI document and
+ * merchant-feed routes.
  *
  * @return bool
  */
@@ -126,7 +127,7 @@ function funkycommerce_backend_preview_request_is_exempt() {
 		return false;
 	}
 
-	foreach ( array( '/wp-admin', '/wp-login.php', '/wp-cron.php', '/xmlrpc.php', '/wp-json', '/graphql', '/wc-api/', '/wp-sitemap', '/product-feed.xml', '/feed.xml', '/rss.xml', '/atom.xml' ) as $prefix ) {
+	foreach ( array( '/wp-admin', '/wp-login.php', '/wp-cron.php', '/xmlrpc.php', '/wp-json', '/graphql', '/wc-api/', '/wp-content/uploads/', '/wp-content/webp-express/', '/wp-content/plugins/webp-express/', '/wp-sitemap', '/product-feed.xml', '/feed.xml', '/rss.xml', '/atom.xml' ) as $prefix ) {
 		if ( 0 === strpos( $path, $prefix ) ) {
 			return true;
 		}
