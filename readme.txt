@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.34
+Stable tag: 1.2.35
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,12 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.35 highlights ==
+
+* Adds a Studio product layout with top-section cross-sells and a full-width long description.
+* Preserves product routing in static-first mode and restores blank inquiry-copy fallbacks.
+* Restores the legacy top-level Netlify status badge controls and improves Control Center plugin ordering.
 
 == 1.2.34 highlights ==
 

@@ -253,7 +253,7 @@ function funkycommerce_layout_control_fields() {
 		'layout_newsletter_popup_variant' => $select( __( 'Newsletter popup layout', 'funkycommerce-headless' ), 'split', array( 'split', 'modern-card', 'modern-center' ), 'newsletter_popup_variant' ),
 		'layout_newsletter_popup_cooldown_days' => array( 'label' => __( 'Newsletter dismissal cooldown (days)', 'funkycommerce-headless' ), 'type' => 'number', 'tier' => 'free', 'default' => '7', 'min' => '1', 'max' => '365', 'step' => '1', 'preview' => 'newsletter_popup_cooldown_days', 'graphKey' => 'newsletterPopupCooldownDays' ),
 
-		'layout_product_page' => $select( __( 'Product page template', 'funkycommerce-headless' ), 'classic', array( 'classic', 'studio' ), 'product_page_layout' ),
+		'layout_product_page' => $select( __( 'Product page template', 'funkycommerce-headless' ), 'classic', array( 'classic', 'studio', 'studio-cross-sell' ), 'product_page_layout' ),
 		'layout_related_products_columns' => $select( __( 'Related products columns', 'funkycommerce-headless' ), '4', array( '2', '3', '4' ), 'related_products_columns' ),
 		'layout_show_studio_related_products_under_meta' => $toggle( __( 'Show related products under categories and brands in Studio', 'funkycommerce-headless' ), 'no', 'show_studio_related_products_under_meta' ),
 		'layout_product_page_wishlist_button' => $select( __( 'Product page wishlist button', 'funkycommerce-headless' ), 'full', array( 'full', 'icon', 'disabled' ), 'product_page_wishlist_button_layout' ),
