@@ -1418,8 +1418,8 @@ function funkycommerce_render_control_center() {
 			<div><strong><?php esc_html_e( 'WPGraphQL SEO', 'funkycommerce-headless' ); ?></strong><span class="<?php echo esc_attr( defined( 'WPGRAPHQL_YOAST_SEO_VERSION' ) ? 'fc-active' : 'fc-inactive' ); ?>"><?php echo esc_html( defined( 'WPGRAPHQL_YOAST_SEO_VERSION' ) ? __( 'Connected', 'funkycommerce-headless' ) : __( 'Required for SEO integration', 'funkycommerce-headless' ) ); ?></span></div>
 			<div><strong><?php esc_html_e( 'WooCommerce Stripe Gateway', 'funkycommerce-headless' ); ?></strong><span class="<?php echo esc_attr( class_exists( 'WC_Stripe' ) ? 'fc-active' : 'fc-inactive' ); ?>"><?php echo esc_html( class_exists( 'WC_Stripe' ) ? __( 'Connected', 'funkycommerce-headless' ) : __( 'Required for Stripe payments', 'funkycommerce-headless' ) ); ?></span></div>
 			<div><strong><?php esc_html_e( 'Runtime coverage', 'funkycommerce-headless' ); ?></strong><span class="fc-active"><?php echo esc_html( $coverage['live'] ); ?> <?php esc_html_e( 'live', 'funkycommerce-headless' ); ?></span></div>
-			<div><strong><?php esc_html_e( 'Newsletter inbox', 'funkycommerce-headless' ); ?></strong><a href="<?php echo esc_url( add_query_arg( 'page', 'funkycommerce-newsletter-submissions', admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $newsletter_count ); ?> <?php esc_html_e( 'unread', 'funkycommerce-headless' ); ?></a></div>
 			<div><strong><?php esc_html_e( 'Superfunky Pro', 'funkycommerce-headless' ); ?></strong><?php if ( $superfunky_pro_active ) : ?><span class="fc-active"><?php esc_html_e( 'Connected', 'funkycommerce-headless' ); ?></span><?php else : ?><a class="fc-inactive" href="https://codedletter.com/products/theme-pro/" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Get Pro', 'funkycommerce-headless' ); ?></a><?php endif; ?></div>
+			<div><strong><?php esc_html_e( 'Newsletter inbox', 'funkycommerce-headless' ); ?></strong><a href="<?php echo esc_url( add_query_arg( 'page', 'funkycommerce-newsletter-submissions', admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $newsletter_count ); ?> <?php esc_html_e( 'unread', 'funkycommerce-headless' ); ?></a></div>
 			<div><strong><?php esc_html_e( 'Form inbox', 'funkycommerce-headless' ); ?></strong><a href="<?php echo esc_url( add_query_arg( 'page', 'funkycommerce-form-submissions', admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $form_count ); ?> <?php esc_html_e( 'unread', 'funkycommerce-headless' ); ?></a></div>
 		</div>
 
@@ -1447,12 +1447,20 @@ function funkycommerce_render_control_center() {
 										<li><?php esc_html_e( 'Set Dynamic content delivery to Serve generated artifacts and configure the storefront variables shown below.', 'funkycommerce-headless' ); ?></li>
 										<li><?php esc_html_e( 'Configure a build webhook. After editing content, use Rebuild storefront in the top admin bar and wait for the deployment badge to succeed.', 'funkycommerce-headless' ); ?></li>
 									</ol>
-									<pre><code>STOREFRONT_ARTIFACT_MODE=artifact
-STOREFRONT_ARTIFACT_DELIVERY=static-first
-STOREFRONT_ARTIFACT_ORIGIN=<?php echo esc_html( untrailingslashit( home_url( '/' ) ) ); ?>
-STOREFRONT_ARTIFACT_SITE_KEY=<?php echo esc_html( $settings['artifact_site_key'] ?: 'unique-site-key' ); ?>
-STOREFRONT_ARTIFACT_SIGNING_SECRET=&lt;same-secret-as-wordpress&gt;
-VITE_ARTIFACT_ROUTE_HYDRATION=true</code></pre>
+									<?php
+									$environment_example = implode(
+										"\n",
+										array(
+											'STOREFRONT_ARTIFACT_MODE=artifact',
+											'STOREFRONT_ARTIFACT_DELIVERY=static-first',
+											'STOREFRONT_ARTIFACT_ORIGIN=' . untrailingslashit( home_url( '/' ) ),
+											'STOREFRONT_ARTIFACT_SITE_KEY=' . ( $settings['artifact_site_key'] ?: 'unique-site-key' ),
+											'STOREFRONT_ARTIFACT_SIGNING_SECRET=<same-secret-as-wordpress>',
+											'VITE_ARTIFACT_ROUTE_HYDRATION=true',
+										)
+									);
+									?>
+									<pre><code><?php echo esc_html( $environment_example ); ?></code></pre>
 									<p><strong><?php esc_html_e( 'Freshness:', 'funkycommerce-headless' ); ?></strong> <?php esc_html_e( 'WordPress collects changes and regenerates artifacts automatically, but static-first public HTML changes only after a storefront build. Until then, visitors keep the previous known-good deployment.', 'funkycommerce-headless' ); ?></p>
 									<p><strong><?php esc_html_e( 'Rollback:', 'funkycommerce-headless' ); ?></strong> <?php esc_html_e( 'Restore the previous static deployment or set STOREFRONT_ARTIFACT_DELIVERY=proxy and rebuild. Never reuse one artifact site key across public sites.', 'funkycommerce-headless' ); ?></p>
 								</div>
