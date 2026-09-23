@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.38
+Stable tag: 1.2.39
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,13 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.39 highlights ==
+
+* Shares native WordPress posts-per-page and effective WooCommerce products-per-page settings with headless archive grids and pagination.
+* Makes grid shortcodes inherit those settings by default; explicit positive page_size values remain editorial overrides.
+* Defaults Products per page override to 0 (inherit WooCommerce); existing saved positive overrides remain effective in both rendering modes.
+* Schedules storefront rebuilding and settings invalidation when native pagination settings change.
 
 == 1.2.38 highlights ==
 
