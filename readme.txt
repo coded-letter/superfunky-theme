@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.39
+Stable tag: 1.2.40
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,14 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.40 highlights ==
+
+* Companion storefront update preserves promotional HTML classes and safe inline styles, and keeps Recipe JSON-LD as data rather than wrapped JavaScript.
+* Product category, tag, and brand archives now use CollectionPage structured data.
+* Storefront builds reject missing required hydration data instead of publishing loading-only pages; backend requests and optional SEO fetching are bounded.
+* Custom CSS remains critical by default. With the matching storefront update, a standalone /* storefront:deferred */ comment between complete rules moves following CSS into a non-render-blocking layer.
+* These fixes are in the frontend; update/rebuild the storefront alongside the theme. No backend behavior changes in this release.
 
 == 1.2.39 highlights ==
 
