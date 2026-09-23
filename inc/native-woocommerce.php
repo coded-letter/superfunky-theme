@@ -91,17 +91,6 @@ function funkycommerce_native_woocommerce_body_classes( $classes ) {
 add_filter( 'body_class', 'funkycommerce_native_woocommerce_body_classes' );
 
 /**
- * Reuse the catalogue "Products per page" setting across the shop archive and
- * every product taxonomy archive.
- */
-function funkycommerce_native_products_per_page( $count ) {
-	$settings = funkycommerce_native_woocommerce_settings();
-	$value    = absint( $settings['products_per_page'] ?? 0 );
-	return $value > 0 ? $value : $count;
-}
-add_filter( 'loop_shop_per_page', 'funkycommerce_native_products_per_page', 20 );
-
-/**
  * Whether product reviews and ratings are enabled from the Control Center.
  */
 function funkycommerce_native_reviews_enabled() {

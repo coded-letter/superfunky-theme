@@ -1264,7 +1264,8 @@ function funkycommerce_native_render_grid( $atts ) {
 	$type = in_array( $a['type'], array( 'product', 'post', 'community-article' ), true ) ? $a['type'] : 'product';
 
 	$page        = isset( $_GET['fcp'] ) ? max( 1, absint( wp_unslash( $_GET['fcp'] ) ) ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-	$per_page    = max( 1, (int) $a['page_size'] );
+	$settings    = funkycommerce_archive_settings();
+	$per_page    = $a['page_size'] > 0 ? (int) $a['page_size'] : $settings[ 'product' === $type ? 'productsPerPage' : 'postsPerPage' ];
 	$base_offset = max( 0, (int) $a['offset'] );
 
 	// WP_Query treats any explicitly-set `offset` (including 0) as overriding
@@ -1277,10 +1278,13 @@ function funkycommerce_native_render_grid( $atts ) {
 	$filters['limit']   = $per_page;
 	$overrides          = array(
 		'posts_per_page' => $per_page,
-		'offset'         => $base_offset + ( ( $page - 1 ) * $per_page ),
+		'offset'         => -1 === $per_page ? 0 : $base_offset + ( ( $page - 1 ) * $per_page ),
 	);
 
 	$result = funkycommerce_native_query_by_type( $type, $filters, $overrides );
+	if ( -1 === $per_page && $base_offset > 0 ) {
+		$result['ids'] = array_slice( $result['ids'], $base_offset );
+	}
 	$cards  = '';
 	foreach ( $result['ids'] as $id ) {
 		$cards .= funkycommerce_native_card_for_type( $type, $id, $a['card_variant'] );
@@ -1291,7 +1295,7 @@ function funkycommerce_native_render_grid( $atts ) {
 	}
 
 	$remaining = max( 0, $result['found'] - $base_offset );
-	$max_pages = $remaining > 0 ? (int) ceil( $remaining / $per_page ) : 0;
+	$max_pages = $remaining > 0 && -1 !== $per_page ? (int) ceil( $remaining / $per_page ) : 0;
 
 	$pagination = '';
 	if ( ! empty( $a['paginated'] ) && $max_pages > 1 ) {

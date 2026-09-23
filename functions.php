@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.38' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.39' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -171,6 +171,7 @@ require_once get_template_directory() . '/inc/control-center.php';
 require_once get_template_directory() . '/inc/admin-view-links.php';
 require_once get_template_directory() . '/inc/frontend-theme.php';
 require_once get_template_directory() . '/inc/custom-404.php';
+require_once get_template_directory() . '/inc/archive-settings.php';
 require_once get_template_directory() . '/inc/native-woocommerce.php';
 require_once get_template_directory() . '/inc/native-shortcodes.php';
 require_once get_template_directory() . '/inc/build-webhooks.php';
@@ -533,7 +534,7 @@ function funkycommerce_content_shortcode_schemas() {
 			'card_variant' => array( 'default' => 'default', 'enum' => array( 'default', 'compact', 'editorial', 'minimal', 'gallery', 'simple', 'variation', 'expandable' ) ),
 			'layout'       => array( 'default' => 'standard', 'enum' => array( 'standard', 'compact', 'editorial', 'masonry' ) ),
 			'columns'      => array( 'default' => 3, 'type' => 'integer', 'min' => 1, 'max' => 6 ),
-			'page_size'    => array( 'default' => 12, 'type' => 'integer', 'min' => 1, 'max' => 48 ),
+			'page_size'    => array( 'default' => 0, 'type' => 'integer', 'min' => 0, 'max' => 48 ),
 			'offset'       => funkycommerce_collection_shortcode_offset_definition(),
 			'paginated'    => array( 'default' => 'true', 'type' => 'boolean' ),
 			'include'      => array( 'default' => '' ),
