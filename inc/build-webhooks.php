@@ -332,9 +332,12 @@ add_action( 'init', 'funkycommerce_ensure_build_schedule' );
 
 /**
  * Debounce publishing changes into one build request.
+ *
+ * Artifact regeneration cannot compile new CMS Tailwind classes, so configured
+ * build hooks remain necessary in shadow and artifact modes too.
  */
 function funkycommerce_schedule_content_build() {
-	if ( ! funkycommerce_is_headless_mode() || 'build-webhook' !== funkycommerce_artifact_mode() ) {
+	if ( ! funkycommerce_is_headless_mode() ) {
 		return;
 	}
 	$settings = funkycommerce_control_center_settings();
@@ -346,7 +349,16 @@ function funkycommerce_schedule_content_build() {
 }
 
 /**
- * Rebuild only for public content that can affect generated storefront routes.
+ * Shared blocks and templates render publicly despite their private post types.
+ */
+function funkycommerce_post_type_affects_storefront_build( $post_type_name ) {
+	$post_type = get_post_type_object( $post_type_name );
+	return ( $post_type && $post_type->public )
+		|| in_array( $post_type_name, array( 'wp_block', 'wp_template', 'wp_template_part' ), true );
+}
+
+/**
+ * Rebuild only for content that can affect generated storefront routes.
  */
 function funkycommerce_schedule_post_build( $post_id, $post, $update ) {
 	unset( $update );
@@ -354,8 +366,7 @@ function funkycommerce_schedule_post_build( $post_id, $post, $update ) {
 		return;
 	}
 
-	$post_type = get_post_type_object( $post->post_type );
-	if ( $post_type && $post_type->public ) {
+	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
 		funkycommerce_schedule_content_build();
 	}
 }
@@ -369,8 +380,7 @@ function funkycommerce_schedule_status_build( $new_status, $old_status, $post ) 
 		return;
 	}
 
-	$post_type = get_post_type_object( $post->post_type );
-	if ( $post_type && $post_type->public ) {
+	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
 		funkycommerce_schedule_content_build();
 	}
 }
@@ -381,8 +391,7 @@ add_action( 'transition_post_status', 'funkycommerce_schedule_status_build', 20,
  */
 function funkycommerce_schedule_deleted_post_build( $post_id, $post ) {
 	unset( $post_id );
-	$post_type = get_post_type_object( $post->post_type );
-	if ( $post_type && $post_type->public ) {
+	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
 		funkycommerce_schedule_content_build();
 	}
 }
@@ -391,3 +400,6 @@ add_action( 'created_term', 'funkycommerce_schedule_content_build' );
 add_action( 'edited_term', 'funkycommerce_schedule_content_build' );
 add_action( 'delete_term', 'funkycommerce_schedule_content_build' );
 add_action( 'profile_update', 'funkycommerce_schedule_content_build' );
+add_action( 'wp_update_nav_menu', 'funkycommerce_schedule_content_build' );
+add_action( 'wp_update_nav_menu_item', 'funkycommerce_schedule_content_build' );
+add_action( 'wp_delete_nav_menu', 'funkycommerce_schedule_content_build' );

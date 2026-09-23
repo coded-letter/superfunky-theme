@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.37
+Stable tag: 1.2.38
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,12 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== 1.2.38 highlights ==
+
+* Restores configured, debounced storefront builds for CMS changes in shadow and artifact modes so new Tailwind utilities compile.
+* Includes published shared blocks/templates, navigation changes, and public Control Center content in rebuild scheduling.
+* Preserves webhook opt-in, headless-mode checks, and revision/autosave guards.
 
 == 1.2.37 highlights ==
 
