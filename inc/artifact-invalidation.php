@@ -323,6 +323,7 @@ function funkycommerce_collect_control_center_change( $old_value, $new_value ) {
 	if ( empty( $changed_keys ) ) {
 		return;
 	}
+	funkycommerce_schedule_content_build();
 	funkycommerce_collect_artifact_changes(
 		array(
 			'config:storefront',
