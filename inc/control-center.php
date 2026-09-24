@@ -21,6 +21,28 @@ function funkycommerce_control_center_fields() {
 }
 
 /**
+ * Expose legacy CSS in the two editors without writing options on read.
+ */
+function funkycommerce_custom_css_settings( $settings ) {
+	$settings['custom_css'] = (string) ( $settings['custom_css'] ?? get_option( 'funkycommerce_custom_css', '' ) );
+	if ( ! array_key_exists( 'custom_css_deferred', $settings ) ) {
+		$layers = preg_split( '/^\s*\/\* storefront:deferred \*\/\s*$/m', $settings['custom_css'], 2 );
+		$settings['custom_css']          = $layers[0];
+		$settings['custom_css_deferred'] = $layers[1] ?? '';
+	}
+	return $settings;
+}
+
+/**
+ * Keep the existing customCss transport and legacy option marker-compatible.
+ */
+function funkycommerce_combined_custom_css( $settings ) {
+	$settings = funkycommerce_custom_css_settings( $settings );
+	$deferred = (string) $settings['custom_css_deferred'];
+	return $settings['custom_css'] . ( '' !== trim( $deferred ) ? "\n/* storefront:deferred */\n" . $deferred : '' );
+}
+
+/**
  * Return schema defaults merged with saved values.
  */
 function funkycommerce_control_center_settings() {
@@ -32,10 +54,8 @@ function funkycommerce_control_center_settings() {
 	}
 	$saved = (array) get_option( 'funkycommerce_control_center', array() );
 	$saved = funkycommerce_recover_corrupted_header_visibility( $saved );
+	$saved = funkycommerce_custom_css_settings( $saved );
 
-	if ( ! array_key_exists( 'custom_css', $saved ) ) {
-		$saved['custom_css'] = (string) get_option( 'funkycommerce_custom_css', '' );
-	}
 	if ( ! array_key_exists( 'enabled_currencies', $saved ) ) {
 		$saved['enabled_currencies'] = (array) get_option( 'funkycommerce_currencies', $defaults['enabled_currencies'] );
 	}
@@ -152,7 +172,8 @@ add_action( 'admin_init', 'funkycommerce_register_control_center' );
  * Sanitize custom storefront CSS without allowing nested style tags.
  */
 function funkycommerce_sanitize_custom_css( $value ) {
-	return preg_replace( '#</?style[^>]*>#i', '', wp_unslash( (string) $value ) );
+	// options.php already unslashes settings; a second pass destroys CSS escapes.
+	return preg_replace( '#</?style[^>]*>#i', '', (string) $value );
 }
 
 function funkycommerce_normalize_spotify_playlist_url( $value ) {
@@ -433,6 +454,7 @@ function funkycommerce_sanitize_control_field( $key, $field, $value, $previous )
 function funkycommerce_sanitize_control_center( $input ) {
 	$input    = is_array( $input ) ? $input : array();
 	$previous = (array) get_option( 'funkycommerce_control_center', array() );
+	$previous = funkycommerce_custom_css_settings( $previous );
 	$output   = array();
 
 	/*
@@ -617,7 +639,7 @@ function funkycommerce_sync_control_center_legacy_options( $old_value, $value ) 
 		}
 	}
 
-	update_option( 'funkycommerce_custom_css', $value['custom_css'] ?? '' );
+	update_option( 'funkycommerce_custom_css', funkycommerce_combined_custom_css( $value ) );
 	update_option( 'funkycommerce_currencies', (array) ( $value['enabled_currencies'] ?? array() ) );
 	update_option( 'funkycommerce_currency_rate_mode', $value['currency_rate_mode'] ?? 'automatic' );
 	update_option( 'funkycommerce_frontend_url', $value['frontend_url'] ?? '' );
@@ -985,6 +1007,7 @@ function funkycommerce_control_field_is_live( $key ) {
 		'ai_assistant_iframe_title',
 		'social_links',
 		'custom_css',
+		'custom_css_deferred',
 		'checkout_heading',
 		'checkout_intro',
 		'checkout_trust_message',

@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.40
+Stable tag: 1.2.49
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,6 +14,86 @@ served by the separate headless application. When headless mode is disabled in t
 Control Center, the theme also ships a complete native WordPress rendering path (see
 "Native frontend theme" below) with accessible header/footer/navigation templates and
 core front/home/singular/archive/search/404 routes styled to match the storefront.
+
+== Storefront CSS controls ==
+
+Open Superfunky > Control Center > Visual & CSS. Critical (above-the-fold) CSS
+applies immediately after Site Editor global styles and WordPress Additional CSS.
+Keep header, promo, hero, fonts, and initial layout rules here. Deferred
+(below-the-fold) CSS is optional: enter complete top-level rules for content that
+is not needed on first paint, without adding a separator.
+
+Existing unmarked CSS, including the legacy funkycommerce_custom_css option,
+stays entirely critical. A legacy standalone /* storefront:deferred */ comment
+opens the following CSS in the deferred editor. This migration is read-only until
+the next settings save; saving another section preserves both layers. Clearing
+the deferred editor removes that layer. Legacy markers remain supported.
+
+The existing customCss output and legacy option combine both editors with the
+same marker; no GraphQL schema change is required. WordPress Additional CSS keeps
+its existing position and stays critical unless it explicitly uses the marker.
+With the matching storefront, deferred styles activate on window load or after
+two seconds, with a no-JavaScript fallback. Rebuild the storefront after saving to
+publish static pages. Older storefronts apply all CSS immediately.
+
+== 1.2.49 candidate ==
+
+* Removes synchronous CMS Tailwind inventory generation and its GraphQL field from the production build path.
+* Restores the proven local reviewed-utility contract used before dynamic extraction, so CSS preparation performs no WordPress requests.
+* Preserves native archive pagination, critical/deferred CSS, direct static navigation, single-locale discovery, hydration safeguards, and admin-bar submission counters.
+
+== 1.2.48 highlights ==
+
+* Paginates within each allowlisted post type using WordPress's `type_status_date` index, avoiding large ID ranges occupied by orders, revisions, and other irrelevant records.
+* Keeps every backend request bounded to one content type and at most 100 stored records.
+* Preserves revision-keyed page caching and rejects content changes during extraction.
+
+== 1.2.47 highlights ==
+
+* Replaces the monolithic cold Tailwind inventory query with bounded, primary-key cursor pages.
+* Caps each backend page at 100 CMS records and 5 MiB of class-only output, eliminating the unbounded request that timed out on storage-bound servers.
+* Caches each page by content revision so later builds reuse the manifest without serving stale CMS classes.
+
+== 1.2.46 highlights ==
+
+* Filters post, product, media, taxonomy, and author rows to class-bearing content in SQL before PHP scans them.
+* Rotates the Tailwind inventory cache so the optimized cold path is measured after updating.
+* Preserves the complete source coverage, class-only parsing, and admin-bar inbox counters from 1.2.45.
+
+== 1.2.45 highlights ==
+
+* Removes the broad post-metadata cache prime from Tailwind manifest generation; WooCommerce metadata is not needed to extract class attributes.
+* Replaces recursive WordPress block parsing with bounded raw class/className matching.
+* Uses a new cache generation so the first 1.2.45 request measures the optimized path rather than reusing an incomplete 1.2.44 attempt.
+* Adds right-side admin-bar icons with unread counters for newsletter and form submissions, immediately before the account menu.
+
+== 1.2.44 highlights ==
+
+* Replaces build-time rendered CMS crawling with one cached, class-only Tailwind manifest.
+* Extracts classes from stored public content, reusable blocks/templates, media, taxonomies, authors, menus, and Control Center HTML without running content filters or shortcodes.
+* Invalidates the manifest when relevant CMS content changes and regenerates it lazily on the next build request.
+* Keeps the direct static navigation payload and explicit single-locale build contract from 1.2.43.
+
+== 1.2.43 highlights ==
+
+* Exposes a bounded direct classic-menu payload for static builds, avoiding WPGraphQL's slow per-menu-item resolver chain.
+* Explicit single-locale storefront builds use their configured locale contract instead of probing WPGraphQL/Polylang.
+* Browser navigation keeps its existing WPGraphQL behavior; static builds fall back to it when the optimized field is unavailable.
+
+== 1.2.42 highlights ==
+
+* Exposes one bounded public build inventory for attachment captions/descriptions, taxonomy descriptions, author bios, and menu descriptions/classes.
+* Avoids slow WPGraphQL connection resolution for these non-rendered class sources; storefronts retain the legacy connection fallback for older themes.
+* Keeps rendered extraction for pages, posts, community posts, and products so block/shortcode output remains represented.
+
+== 1.2.41 highlights ==
+
+* Adds separate critical and deferred CSS editors under Visual & CSS, preserving existing CSS and the legacy separator.
+* Reuses identical post/product headless-field and public rating resolver results within one read-only GraphQL operation.
+* Resolver reuse is scoped by operation, site, viewer and locale, capped at 256 entries / 8 MiB, and bypassed for mutations. REST voting remains uncached.
+* Standard WordPress and headless rendering remain separate. Page rendering is not memoized because block-support styles accumulate during rendering.
+* Companion storefront changes reuse extracted bodies, catalog cards and public responses, and request post-detail metadata in batches of two while retaining all comments.
+* Focused companion JavaScript regressions and Node-only CSS contracts pass; TypeScript has no additional diagnostics against the existing baseline. PHP execution, storefront builds and production timing validation remain deferred. The under-eight-minute target is unverified.
 
 == 1.2.40 highlights ==
 
