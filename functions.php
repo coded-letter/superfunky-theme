@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.49' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.54' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -174,6 +174,8 @@ require_once get_template_directory() . '/inc/custom-404.php';
 require_once get_template_directory() . '/inc/archive-settings.php';
 require_once get_template_directory() . '/inc/native-woocommerce.php';
 require_once get_template_directory() . '/inc/native-shortcodes.php';
+require_once get_template_directory() . '/inc/tailwind-manifest-cleanup.php';
+require_once get_template_directory() . '/inc/tailwind-source-api.php';
 require_once get_template_directory() . '/inc/build-webhooks.php';
 require_once get_template_directory() . '/inc/artifact-renderer.php';
 require_once get_template_directory() . '/inc/artifact-invalidation.php';
@@ -193,7 +195,7 @@ function funkycommerce_headless_setup() {
 	add_theme_support( 'responsive-embeds' );
 	add_theme_support( 'wp-block-styles' );
 	add_theme_support( 'automatic-feed-links' );
-	add_editor_style( 'style.css' );
+	add_editor_style( 'assets/dist/theme.css' );
 
 	register_nav_menus(
 		array(
