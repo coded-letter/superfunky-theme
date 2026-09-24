@@ -7,23 +7,13 @@ Description: A minimal, content-first block theme for polished WordPress preview
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Version: 1.2.49
+Version: 1.2.54
 Update URI: https://github.com/coded-letter/superfunky-theme
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: funkycommerce-headless
 Tags: block-patterns, block-styles, custom-colors, custom-logo, custom-menu, editor-style, featured-images, full-site-editing, translation-ready, wide-blocks
 */
-
-/*
- * Native frontend shell styles. When headless mode is enabled these mostly
- * back the block-editor canvas and admin previews; when headless mode is
- * disabled (see funkycommerce_is_headless_mode()) this same compiled sheet
- * powers the public-facing native WordPress templates, giving editor/public
- * style parity from a single source (assets/css/theme-source.css, compiled
- * via the theme's own Tailwind build --- see package.json).
- */
-@import url("assets/dist/theme.css");
 
 body {
 	margin: 0;

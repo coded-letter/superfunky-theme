@@ -22,7 +22,6 @@ function funkycommerce_static_generation_config() {
 	$headers  = function_exists( 'funkycommerce_security_header_values' )
 		? funkycommerce_security_header_values()
 		: array();
-
 	return array(
 		'frontendUrl'            => (string) ( $settings['frontend_url'] ?? '' ),
 		'buildProvider'          => (string) ( $settings['build_provider'] ?? 'netlify' ),
@@ -451,7 +450,6 @@ function funkycommerce_schedule_post_build( $post_id, $post, $update ) {
 	if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || 'publish' !== $post->post_status ) {
 		return;
 	}
-
 	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
 		funkycommerce_schedule_content_build();
 	}
@@ -465,7 +463,6 @@ function funkycommerce_schedule_status_build( $new_status, $old_status, $post ) 
 	if ( $new_status === $old_status || ( 'publish' !== $new_status && 'publish' !== $old_status ) ) {
 		return;
 	}
-
 	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
 		funkycommerce_schedule_content_build();
 	}
@@ -476,7 +473,6 @@ add_action( 'transition_post_status', 'funkycommerce_schedule_status_build', 20,
  * Rebuild when a public content node is deleted.
  */
 function funkycommerce_schedule_deleted_post_build( $post_id, $post ) {
-	unset( $post_id );
 	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
 		funkycommerce_schedule_content_build();
 	}

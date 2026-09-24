@@ -1480,6 +1480,7 @@ function funkycommerce_render_control_center() {
 											'STOREFRONT_ARTIFACT_SITE_KEY=' . ( $settings['artifact_site_key'] ?: 'unique-site-key' ),
 											'STOREFRONT_ARTIFACT_SIGNING_SECRET=<same-secret-as-wordpress>',
 											'VITE_ARTIFACT_ROUTE_HYDRATION=true',
+											'CMS_TAILWIND_SOURCE_API_URL=' . rest_url( 'funkycommerce-tailwind/v1' ),
 										)
 									);
 									?>

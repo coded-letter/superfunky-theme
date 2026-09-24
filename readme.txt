@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.49
+Stable tag: 1.2.54
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,7 +36,40 @@ With the matching storefront, deferred styles activate on window load or after
 two seconds, with a no-JavaScript fallback. Rebuild the storefront after saving to
 publish static pages. Older storefronts apply all CSS immediately.
 
-== 1.2.49 candidate ==
+== 1.2.54 candidate ==
+
+* Excludes media attachments at the Tailwind inventory query boundary, reducing build traffic before incremental comparison.
+* Supports safely paced one-time frontend extractor policy upgrades without adding work to WordPress saves.
+
+== 1.2.53 highlights ==
+
+* Adds signed, read-only Tailwind source inventory and explicit ten-source batch endpoints for build-owned extraction.
+* Reads only IDs, versions, and requested raw stored fields through bounded direct SQL; it never renders content, parses classes, writes state, or schedules work.
+* Lets Netlify reuse the previously deployed per-source class index, fetch only changed content, and remove deleted or unpublished sources.
+* Keeps all Tailwind extraction and validation in Node while preserving the backend-safe 1.2.52 save path.
+
+== 1.2.52 highlights ==
+
+* Removes all CMS Tailwind extraction from post saves, status transitions, deletions, REST requests, and automatic cron workers.
+* Clears Tailwind backfill, aggregation, and retry events left by versions 1.2.50 and 1.2.51 during a one-time lightweight upgrade cleanup.
+* Restores storefront builds to the proven reviewed local Tailwind utility contract, with no CMS manifest dependency.
+* Preserves the corrected editor stylesheet path, critical/deferred CSS controls, and all non-Tailwind theme improvements.
+
+== 1.2.51 highlights ==
+
+* Makes page saves strictly per-post: extraction writes one bounded private metadata shard and immediately returns without aggregating, validating, or publishing the complete manifest.
+* Moves the bounded class union and manifest publication into debounced WP-Cron batches, then schedules Netlify only after a complete revision is available.
+* Ships an incomplete baseline manifest and serves the completed precomputed JSON from a non-autoloaded option, removing runtime directory and file-permission requirements.
+* Loads the compiled editor stylesheet once through the editor-style API, preventing the duplicate iframe warning and `/wp-admin/assets/dist/theme.css` 404.
+
+== 1.2.50 highlights ==
+
+* Extracts class and className candidates incrementally when public content is saved, unpublished, or deleted.
+* Publishes a bounded, versioned JSON manifest through an atomic same-directory rename, retaining the previous valid artifact when generation fails.
+* Backfills existing content asynchronously in 25-row primary-key batches and delays the Netlify webhook until a complete manifest is ready.
+* Exposes manifest URL, revision, counts, progress, and errors through the existing static-generation diagnostics.
+
+== 1.2.49 highlights ==
 
 * Removes synchronous CMS Tailwind inventory generation and its GraphQL field from the production build path.
 * Restores the proven local reviewed-utility contract used before dynamic extraction, so CSS preparation performs no WordPress requests.
@@ -466,22 +499,15 @@ the Control Center's PHP contracts:
   parts, the native shell (sticky/collapsible announcement header, accessible primary
   navigation, dark-mode toggle, crystal-style loading overlay, footer newsletter panel,
   and lazy-loaded Spotify slot) works immediately with zero additional PHP wiring.
-* `inc/frontend-theme.php` is an optional, self-contained upgrade path that is **not**
-  currently loaded by `functions.php`. It idiomatically `wp_enqueue_style`/
-  `wp_enqueue_script`s the same compiled files (so browsers can cache them separately
-  from inline page HTML), mirrors Control Center loader/Spotify settings to the frontend
-  script via `wp_localize_script()` when `funkycommerce_storefront_control_settings()` is
-  available, and reflects a configured Spotify playlist embed URL into the static footer
-  markup via a `render_block` filter. To activate it, add one line to `functions.php`:
-  `require_once get_template_directory() . '/inc/frontend-theme.php';`. The theme is
-  fully functional and styled without this line; it only upgrades asset delivery and
-  wires dynamic Control Center settings once added.
+* `inc/frontend-theme.php` loads the compiled stylesheet and script on the native
+  frontend, mirrors Control Center loader/Spotify settings via `wp_localize_script()`,
+  and reflects a configured Spotify playlist embed URL into the static footer markup.
 * `theme.json` exposes `settings.custom.fc.*` tokens (radius, loader size/duration/
   glow-color/glow-opacity) as `--wp--custom--fc--*` CSS custom properties, matching the
   Control Center schema's `loading` section defaults, so the loader looks correct even
-  before `inc/frontend-theme.php` is wired in. `style.css` `@import`s the same compiled
-  stylesheet consumed by the existing `add_editor_style( 'style.css' )` call, giving the
-  block editor canvas and the public front end visual parity from one CSS source.
+  before the localized settings load. The compiled `assets/dist/theme.css` file is
+  registered directly with `add_editor_style()`, giving the block editor canvas and the
+  public front end visual parity without a relative `style.css` import.
 * The header's primary navigation uses a `core/navigation` block with no `ref`, relying
   on WordPress's classic-menu-fallback (a "Header Menu" location menu is promoted to a
   `wp_navigation` post on first render). The footer's link columns are static, editable

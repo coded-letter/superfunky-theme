@@ -167,21 +167,3 @@ function funkycommerce_inject_spotify_embed_url( $block_content, $block ) {
 	return $block_content;
 }
 add_filter( 'render_block', 'funkycommerce_inject_spotify_embed_url', 10, 2 );
-
-/**
- * Give the block editor canvas the same compiled stylesheet used on the
- * frontend, in addition to the existing add_editor_style( 'style.css' ) call
- * already present in functions.php (style.css @imports this same file).
- */
-function funkycommerce_enqueue_editor_theme_assets() {
-	$css_path = get_theme_file_path( 'assets/dist/theme.css' );
-	if ( file_exists( $css_path ) ) {
-		wp_enqueue_style(
-			'funkycommerce-frontend-theme-editor',
-			get_theme_file_uri( 'assets/dist/theme.css' ),
-			array(),
-			filemtime( $css_path )
-		);
-	}
-}
-add_action( 'enqueue_block_editor_assets', 'funkycommerce_enqueue_editor_theme_assets' );
