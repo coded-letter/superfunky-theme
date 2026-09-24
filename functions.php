@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.40' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.49' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -1211,6 +1211,37 @@ function funkycommerce_render_headless_content_field( $post_id, $field, $filter 
 }
 
 /**
+ * Reuse resolver work within one read-only GraphQL operation, never across requests.
+ */
+function funkycommerce_graphql_query_value( $info, $key, $resolve ) {
+	static $operation = null;
+	static $values    = array();
+	static $bytes     = 0;
+
+	$current = is_object( $info ) ? ( $info->operation ?? null ) : null;
+	if ( ! is_object( $current ) || 'query' !== ( $current->operation ?? null ) ) {
+		return $resolve();
+	}
+	if ( $operation !== $current ) {
+		$operation = $current;
+		$values    = array();
+		$bytes     = 0;
+	}
+	$key = get_current_blog_id() . ':' . get_current_user_id() . ':' . get_locale() . ':' . $key;
+	if ( array_key_exists( $key, $values ) ) {
+		return $values[ $key ];
+	}
+
+	$value = $resolve();
+	$size  = is_string( $value ) ? strlen( $value ) : strlen( serialize( $value ) );
+	if ( count( $values ) < 256 && $bytes + $size <= 8 * 1024 * 1024 ) {
+		$values[ $key ] = $value;
+		$bytes        += $size;
+	}
+	return $value;
+}
+
+/**
  * Request the bundled docs enhancer without shipping executable editor content.
  *
  * Existing published docs are also detected by their known DOM shape in the
@@ -1505,7 +1536,7 @@ function funkycommerce_get_headless_theme_styles() {
 	);
 
 	$control_settings = (array) get_option( 'funkycommerce_control_center', array() );
-	$custom_css       = $control_settings['custom_css'] ?? get_option( 'funkycommerce_custom_css', '' );
+	$custom_css       = funkycommerce_combined_custom_css( $control_settings );
 
 	return array(
 		'customCss'       => trim( ( function_exists( 'wp_get_custom_css' ) ? wp_get_custom_css() : '' ) . "\n" . (string) $custom_css ),
@@ -1635,9 +1666,15 @@ function funkycommerce_register_headless_content_graphql_fields() {
 		array(
 			'type'        => 'String',
 			'description' => __( 'Rendered post content with the configured editor-script policy applied.', 'funkycommerce-headless' ),
-			'resolve'     => function ( $post ) {
+			'resolve'     => function ( $post, $args, $context, $info ) {
 				$post_id = funkycommerce_graphql_content_database_id( $post );
-				return $post_id ? funkycommerce_render_headless_content_field( $post_id, 'post_content', 'the_content' ) : '';
+				return $post_id ? funkycommerce_graphql_query_value(
+					$info,
+					'headless-content:' . $post_id,
+					static function () use ( $post_id ) {
+						return funkycommerce_render_headless_content_field( $post_id, 'post_content', 'the_content' );
+					}
+				) : '';
 			},
 		)
 	);
@@ -1648,9 +1685,15 @@ function funkycommerce_register_headless_content_graphql_fields() {
 		array(
 			'type'        => 'String',
 			'description' => __( 'Rendered product description with the configured editor-script policy applied.', 'funkycommerce-headless' ),
-			'resolve'     => function ( $product ) {
+			'resolve'     => function ( $product, $args, $context, $info ) {
 				$product_id = funkycommerce_graphql_content_database_id( $product );
-				return $product_id ? funkycommerce_render_headless_content_field( $product_id, 'post_content', 'the_content' ) : '';
+				return $product_id ? funkycommerce_graphql_query_value(
+					$info,
+					'headless-content:' . $product_id,
+					static function () use ( $product_id ) {
+						return funkycommerce_render_headless_content_field( $product_id, 'post_content', 'the_content' );
+					}
+				) : '';
 			},
 		)
 	);
@@ -1661,9 +1704,15 @@ function funkycommerce_register_headless_content_graphql_fields() {
 		array(
 			'type'        => 'String',
 			'description' => __( 'Rendered product short description with the configured editor-script policy applied.', 'funkycommerce-headless' ),
-			'resolve'     => function ( $product ) {
+			'resolve'     => function ( $product, $args, $context, $info ) {
 				$product_id = funkycommerce_graphql_content_database_id( $product );
-				return $product_id ? funkycommerce_render_headless_content_field( $product_id, 'post_excerpt', 'woocommerce_short_description' ) : '';
+				return $product_id ? funkycommerce_graphql_query_value(
+					$info,
+					'headless-excerpt:' . $product_id,
+					static function () use ( $product_id ) {
+						return funkycommerce_render_headless_content_field( $product_id, 'post_excerpt', 'woocommerce_short_description' );
+					}
+				) : '';
 			},
 		)
 	);

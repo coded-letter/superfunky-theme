@@ -1008,23 +1008,134 @@ add_action( 'init', 'funkycommerce_register_submission_form_block' );
  * Count inbox records, optionally by workflow status.
  */
 function funkycommerce_submission_count( $post_type, $status = '' ) {
+	static $counts = array();
+
+	$post_type = sanitize_key( $post_type );
+	$status    = sanitize_key( $status );
+	$cache_key = $post_type . ':' . $status;
+	if ( array_key_exists( $cache_key, $counts ) ) {
+		return $counts[ $cache_key ];
+	}
+
 	$args = array(
 		'post_type'      => $post_type,
 		'post_status'    => 'private',
 		'posts_per_page' => 1,
 		'fields'         => 'ids',
 	);
-	if ( $status ) {
+	if ( 'unread' === $status ) {
+		$args['meta_query'] = array(
+			'relation' => 'OR',
+			array(
+				'key'   => '_fc_status',
+				'value' => 'unread',
+			),
+			array(
+				'key'     => '_fc_status',
+				'compare' => 'NOT EXISTS',
+			),
+			array(
+				'key'   => '_fc_status',
+				'value' => '',
+			),
+		);
+	} elseif ( $status ) {
 		$args['meta_query'] = array(
 			array(
 				'key'   => '_fc_status',
-				'value' => sanitize_key( $status ),
+				'value' => $status,
 			),
 		);
 	}
 	$query = new WP_Query( $args );
-	return (int) $query->found_posts;
+	$counts[ $cache_key ] = (int) $query->found_posts;
+	return $counts[ $cache_key ];
 }
+
+/**
+ * Render one accessible admin-bar inbox title.
+ */
+function funkycommerce_submission_admin_bar_title( $icon, $label, $count ) {
+	$count         = max( 0, (int) $count );
+	$visible_count = 99 < $count ? '99+' : number_format_i18n( $count );
+	return sprintf(
+		'<span class="ab-icon dashicons %1$s" aria-hidden="true"></span><span class="screen-reader-text">%2$s</span><span class="fc-admin-bar-counter%3$s" aria-hidden="true">%4$s</span>',
+		esc_attr( $icon ),
+		esc_html( $label ),
+		0 === $count ? ' is-empty' : '',
+		esc_html( $visible_count )
+	);
+}
+
+/**
+ * Put unread submission counters immediately before the account menu.
+ */
+function funkycommerce_submission_admin_bar( $admin_bar ) {
+	if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+
+	$newsletter_count = funkycommerce_submission_count( 'fc_newsletter', 'unread' );
+	$form_count       = funkycommerce_submission_count( 'fc_form_entry', 'unread' );
+	$admin_bar->add_node(
+		array(
+			'id'     => 'funkycommerce-newsletter-notifications',
+			'parent' => 'top-secondary',
+			'title'  => funkycommerce_submission_admin_bar_title(
+				'dashicons-email-alt',
+				sprintf(
+					_n( '%s unread newsletter submission', '%s unread newsletter submissions', $newsletter_count, 'funkycommerce-headless' ),
+					number_format_i18n( $newsletter_count )
+				),
+				$newsletter_count
+			),
+			'href'   => add_query_arg( 'page', 'funkycommerce-newsletter-submissions', admin_url( 'admin.php' ) ),
+			'meta'   => array(
+				'class' => 'fc-submission-notification fc-submission-notification--newsletter',
+				'title' => __( 'Open newsletter submissions', 'funkycommerce-headless' ),
+			),
+		)
+	);
+	$admin_bar->add_node(
+		array(
+			'id'     => 'funkycommerce-form-notifications',
+			'parent' => 'top-secondary',
+			'title'  => funkycommerce_submission_admin_bar_title(
+				'dashicons-feedback',
+				sprintf(
+					_n( '%s unread form submission', '%s unread form submissions', $form_count, 'funkycommerce-headless' ),
+					number_format_i18n( $form_count )
+				),
+				$form_count
+			),
+			'href'   => add_query_arg( 'page', 'funkycommerce-form-submissions', admin_url( 'admin.php' ) ),
+			'meta'   => array(
+				'class' => 'fc-submission-notification fc-submission-notification--form',
+				'title' => __( 'Open form submissions', 'funkycommerce-headless' ),
+			),
+		)
+	);
+}
+add_action( 'admin_bar_menu', 'funkycommerce_submission_admin_bar', -1 );
+
+/**
+ * Keep the compact counters legible on both admin and storefront toolbars.
+ */
+function funkycommerce_submission_admin_bar_assets() {
+	if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	wp_add_inline_style(
+		'admin-bar',
+		'#wpadminbar .fc-submission-notification>.ab-item{align-items:center;display:flex;gap:4px;padding-inline:7px}'
+		. '#wpadminbar .fc-submission-notification .ab-icon{float:none;margin:0;padding:0;position:static;width:20px}'
+		. '#wpadminbar .fc-submission-notification .ab-icon:before{top:2px}'
+		. '#wpadminbar .fc-admin-bar-counter{background:#d63638;border-radius:10px;box-sizing:border-box;color:#fff;font-size:10px;font-weight:600;line-height:17px;min-width:17px;padding:0 5px;text-align:center}'
+		. '#wpadminbar .fc-admin-bar-counter.is-empty{background:#646970}'
+	);
+}
+add_action( 'admin_enqueue_scripts', 'funkycommerce_submission_admin_bar_assets' );
+add_action( 'wp_enqueue_scripts', 'funkycommerce_submission_admin_bar_assets' );
 
 /**
  * Build the workflow filter shared by inbox screens and CSV exports.

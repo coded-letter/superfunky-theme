@@ -523,7 +523,8 @@ function funkycommerce_control_center_sections() {
 						'twilight'        => __( 'Prism Twilight', 'funkycommerce-headless' ),
 					),
 				),
-				'custom_css'          => array( 'label' => __( 'Custom storefront CSS', 'funkycommerce-headless' ), 'type' => 'code', 'tier' => 'free', 'sanitize' => 'css', 'description' => __( 'Loaded after Site Editor global styles and WordPress Additional CSS.', 'funkycommerce-headless' ) ),
+				'custom_css'          => array( 'label' => __( 'Critical (above-the-fold) CSS', 'funkycommerce-headless' ), 'type' => 'code', 'tier' => 'free', 'sanitize' => 'css', 'description' => __( 'Applied immediately after Site Editor global styles and WordPress Additional CSS. Keep header, promo, hero, fonts, and initial layout rules here. Existing CSS stays critical unless explicitly deferred; legacy standalone /* storefront:deferred */ markers are still supported.', 'funkycommerce-headless' ) ),
+				'custom_css_deferred' => array( 'label' => __( 'Deferred (below-the-fold) CSS', 'funkycommerce-headless' ), 'type' => 'code', 'tier' => 'free', 'sanitize' => 'css', 'default' => '', 'description' => __( 'Optional non-render-blocking CSS for below-the-fold content. Enter complete top-level rules only; no separator is needed. Activated on window load or after two seconds by the matching storefront, with a no-JavaScript fallback. Rebuild the storefront to publish static pages.', 'funkycommerce-headless' ) ),
 			),
 		),
 		'checkout' => array(

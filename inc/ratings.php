@@ -424,8 +424,15 @@ function funkycommerce_register_rating_graphql() {
 			array(
 				'type'        => array( 'non_null' => 'FunkycommerceRatingSummary' ),
 				'description' => __( 'Unified public rating aggregate. Deploy this schema before the matching storefront.', 'funkycommerce-headless' ),
-				'resolve'     => function ( $source ) use ( $target_type ) {
-					return funkycommerce_rating_summary( $target_type, funkycommerce_rating_graphql_database_id( $source ) );
+				'resolve'     => function ( $source, $args, $context, $info ) use ( $target_type ) {
+					$target_id = funkycommerce_rating_graphql_database_id( $source );
+					return funkycommerce_graphql_query_value(
+						$info,
+						'rating:' . $target_type . ':' . $target_id,
+						static function () use ( $target_type, $target_id ) {
+							return funkycommerce_rating_summary( $target_type, $target_id );
+						}
+					);
 				},
 			)
 		);

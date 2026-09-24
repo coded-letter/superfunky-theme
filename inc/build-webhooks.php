@@ -58,6 +58,77 @@ function funkycommerce_static_generation_config() {
 }
 
 /**
+ * Return classic menu data without WPGraphQL's per-field resolver overhead.
+ */
+function funkycommerce_static_navigation() {
+	$registered_locations = get_nav_menu_locations();
+	$menus                = array();
+	$item_count           = 0;
+
+	foreach ( array_slice( wp_get_nav_menus( array( 'hide_empty' => false ) ), 0, 100 ) as $menu ) {
+		$locations = array();
+		foreach ( $registered_locations as $location => $term_id ) {
+			if ( absint( $term_id ) === absint( $menu->term_id ) ) {
+				$locations[] = strtoupper( sanitize_key( $location ) );
+			}
+		}
+		$items = array();
+		foreach ( (array) wp_get_nav_menu_items(
+			$menu->term_id,
+			array(
+				'update_post_term_cache' => false,
+			)
+		) as $item ) {
+			$item_count++;
+			if ( $item_count > 5000 ) {
+				throw new RuntimeException( 'The static navigation inventory exceeded 5000 items.' );
+			}
+			$url     = (string) ( $item->url ?? '' );
+			$classes = is_array( $item->classes ?? null )
+				? array_values(
+					array_filter(
+						array_map(
+							static function ( $class ) {
+								return is_scalar( $class ) ? trim( (string) $class ) : '';
+							},
+							$item->classes
+						)
+					)
+				)
+				: array();
+			$items[] = array(
+				'id'                 => base64_encode( 'menu-item:' . absint( $item->ID ) ),
+				'databaseId'         => absint( $item->ID ),
+				'parentDatabaseId'   => absint( $item->menu_item_parent ) ?: null,
+				'order'              => absint( $item->menu_order ),
+				'label'              => (string) $item->title,
+				'title'              => (string) ( $item->attr_title ?: $item->title ),
+				'description'        => (string) $item->description,
+				'path'               => $url ? wp_make_link_relative( $url ) : '',
+				'uri'                => $url ? wp_make_link_relative( $url ) : '',
+				'url'                => $url,
+				'target'             => (string) $item->target,
+				'cssClasses'         => $classes,
+				'linkRelationship'   => (string) $item->xfn,
+			);
+		}
+		$menus[] = array(
+			'id'        => base64_encode( 'menu:' . absint( $menu->term_id ) ),
+			'databaseId' => absint( $menu->term_id ),
+			'name'      => (string) $menu->name,
+			'slug'      => (string) $menu->slug,
+			'locations' => $locations,
+			'menuItems' => array( 'nodes' => $items ),
+		);
+	}
+
+	return array(
+		'schemaVersion' => 1,
+		'menus'         => array( 'nodes' => $menus ),
+	);
+}
+
+/**
  * Expose public build inputs to CI without exposing privileged deployment settings.
  */
 function funkycommerce_register_static_generation_graphql() {
@@ -69,6 +140,21 @@ function funkycommerce_register_static_generation_graphql() {
 			'description' => __( 'Public, allowlisted storefront static-generation controls as JSON.', 'funkycommerce-headless' ),
 			'resolve'     => static function() {
 				return wp_json_encode( funkycommerce_static_generation_config() );
+			},
+		)
+	);
+	register_graphql_field(
+		'RootQuery',
+		'funkycommerceStaticNavigation',
+		array(
+			'type'        => array( 'non_null' => 'String' ),
+			'description' => __( 'Bounded public classic-menu payload used for storefront static generation.', 'funkycommerce-headless' ),
+			'resolve'     => static function() {
+				$encoded = wp_json_encode( funkycommerce_static_navigation(), JSON_UNESCAPED_SLASHES );
+				if ( false === $encoded || strlen( $encoded ) > 5 * 1024 * 1024 ) {
+					throw new RuntimeException( 'The static navigation payload could not be encoded within its limit.' );
+				}
+				return $encoded;
 			},
 		)
 	);
@@ -333,8 +419,8 @@ add_action( 'init', 'funkycommerce_ensure_build_schedule' );
 /**
  * Debounce publishing changes into one build request.
  *
- * Artifact regeneration cannot compile new CMS Tailwind classes, so configured
- * build hooks remain necessary in shadow and artifact modes too.
+ * Static storefront routes still require configured build hooks in shadow and
+ * artifact modes.
  */
 function funkycommerce_schedule_content_build() {
 	if ( ! funkycommerce_is_headless_mode() ) {
