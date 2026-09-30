@@ -22,10 +22,14 @@ function funkycommerce_static_generation_config() {
 	$headers  = function_exists( 'funkycommerce_security_header_values' )
 		? funkycommerce_security_header_values()
 		: array();
+	$netlify_rules_enabled = function_exists( 'funkycommerce_field_accessible' )
+		&& funkycommerce_field_accessible( 'netlify_redirects', array( 'tier' => 'pro' ) );
 	return array(
 		'frontendUrl'            => (string) ( $settings['frontend_url'] ?? '' ),
 		'buildProvider'          => (string) ( $settings['build_provider'] ?? 'netlify' ),
 		'buildBadgeId'           => (string) ( $settings['build_badge_id'] ?? '' ),
+		'netlifyRedirects'       => $netlify_rules_enabled ? (string) ( $settings['netlify_redirects'] ?? '' ) : '',
+		'netlifyHeaders'         => $netlify_rules_enabled ? (string) ( $settings['netlify_headers'] ?? '' ) : '',
 		'buildStatusBadgeUrl'    => (string) ( $settings['build_status_badge_url'] ?? '' ),
 		'buildDashboardUrl'      => (string) ( $settings['build_dashboard_url'] ?? '' ),
 		'sitemapEnabled'         => 'no' !== ( $settings['sitemap_enabled'] ?? 'yes' ),

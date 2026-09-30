@@ -89,9 +89,14 @@ function funkycommerce_frontend_theme_localized_settings() {
 			$language = function_exists( 'pll_current_language' )
 				? pll_current_language( 'slug' )
 				: strtolower( strtok( determine_locale(), '_-' ) );
-			$settings['spotify']['title'] = ! empty( $control['footer']['spotifyPlayerTitle'] )
+			$store_name = sanitize_text_field( (string) ( $control['branding']['storeName'] ?? get_bloginfo( 'name' ) ) );
+			if ( '' === $store_name ) {
+				$store_name = 'FunkyCommerce';
+			}
+			$radio_title = ! empty( $control['footer']['spotifyPlayerTitle'] )
 				? $control['footer']['spotifyPlayerTitle']
-				: funkycommerce_frontend_theme_ui_string( 'footer.radio.title', $language, __( 'Superfunky Radio', 'funkycommerce-headless' ) );
+				: funkycommerce_frontend_theme_ui_string( 'footer.radio.title', $language, sprintf( __( '%s Radio', 'funkycommerce-headless' ), $store_name ) );
+			$settings['spotify']['title'] = str_replace( '{brand}', $store_name, (string) $radio_title );
 			$settings['spotify']['description'] = ! empty( $control['footer']['spotifyPlayerDescription'] )
 				? $control['footer']['spotifyPlayerDescription']
 				: funkycommerce_frontend_theme_ui_string( 'footer.radio.description', $language, '' );
