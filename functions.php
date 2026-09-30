@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.54' );
+define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '1.2.55' );
 
 /**
  * Whether Superfunky Pro is active and licensed.
@@ -451,7 +451,7 @@ function funkycommerce_content_shortcode_schemas() {
 			'content_type' => array( 'default' => 'playlist', 'enum' => array( 'track', 'album', 'playlist', 'artist', 'show', 'episode' ) ),
 			'height'       => array( 'default' => 400, 'type' => 'integer', 'min' => 152, 'max' => 800 ),
 			'theme'        => array( 'default' => 'auto', 'enum' => array( 'auto', 'dark', 'light' ) ),
-			'title'        => array( 'default' => __( 'Superfunky Radio', 'funkycommerce-headless' ) ),
+			'title'        => array( 'default' => sprintf( __( '%s Radio', 'funkycommerce-headless' ), get_bloginfo( 'name' ) ) ),
 			'description'  => array( 'default' => '' ),
 		),
 		'chat_assistant'   => array(),

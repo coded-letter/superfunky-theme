@@ -11,9 +11,9 @@ const style = source("style.css");
 const webhooks = source("inc/build-webhooks.php");
 const parser = new Engine({ parser: { suppressErrors: false } });
 
-test("theme 1.2.54 retains the one-time Tailwind worker cleanup", () => {
+test("theme 1.2.55 retains the one-time Tailwind worker cleanup", () => {
   assert.doesNotThrow(() => parser.parseCode(cleanup));
-  assert.match(functions, /FUNKYCOMMERCE_HEADLESS_VERSION', '1\.2\.54'/);
+  assert.match(functions, /FUNKYCOMMERCE_HEADLESS_VERSION', '1\.2\.55'/);
   assert.match(functions, /require_once .*\/inc\/tailwind-manifest-cleanup\.php'/);
   assert.doesNotMatch(functions, /tailwind-class-manifest\.php/);
 });

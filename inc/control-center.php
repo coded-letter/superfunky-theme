@@ -434,6 +434,26 @@ function funkycommerce_sanitize_control_field( $key, $field, $value, $previous )
 		return wp_check_invalid_utf8( wp_unslash( (string) $value ), true );
 	}
 
+	if ( 'code' === $type && in_array( $field['sanitize'] ?? '', array( 'netlify_redirects', 'netlify_headers' ), true ) ) {
+		$raw = wp_check_invalid_utf8( (string) $value, true );
+		$raw = str_replace( "\r\n", "\n", $raw );
+		$reason = funkycommerce_validate_netlify_file_setting( $raw, $field['sanitize'] );
+		if ( '' !== $reason ) {
+			add_settings_error(
+				'funkycommerce_control_center',
+				'invalid_' . $field['sanitize'],
+				sprintf(
+					/* translators: 1: field label, 2: validation reason. */
+					__( '%1$s was not saved: %2$s', 'funkycommerce-headless' ),
+					$field['label'],
+					$reason
+				)
+			);
+			return $previous;
+		}
+		return $raw;
+	}
+
 	if ( 'code' === $type || 'textarea' === $type ) {
 		$value = wp_unslash( (string) $value );
 		if ( 'html' === ( $field['sanitize'] ?? '' ) ) {
@@ -446,6 +466,69 @@ function funkycommerce_sanitize_control_field( $key, $field, $value, $previous )
 	}
 
 	return sanitize_text_field( wp_unslash( (string) $value ) );
+}
+
+/**
+ * Validate bounded raw Netlify-format redirect or header rules.
+ *
+ * @param string $contents Raw file contents.
+ * @param string $kind     Either netlify_redirects or netlify_headers.
+ * @return string Empty when valid, otherwise a user-visible reason.
+ */
+function funkycommerce_validate_netlify_file_setting( $contents, $kind ) {
+	if ( strlen( $contents ) > 65536 ) {
+		return __( 'The content exceeds the 64 KB limit.', 'funkycommerce-headless' );
+	}
+	if ( false !== strpos( $contents, "\r" ) || preg_match( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $contents ) ) {
+		return __( 'Control characters are not allowed.', 'funkycommerce-headless' );
+	}
+	$lines = explode( "\n", $contents );
+	if ( count( $lines ) > 1000 ) {
+		return __( 'The content exceeds the 1,000-line limit.', 'funkycommerce-headless' );
+	}
+
+	$has_header_path = false;
+	foreach ( $lines as $line_number => $line ) {
+		if ( strlen( $line ) > 4096 ) {
+			return sprintf(
+				/* translators: %d: line number. */
+				__( 'Line %d exceeds the 4 KB line limit.', 'funkycommerce-headless' ),
+				$line_number + 1
+			);
+		}
+		if ( '' === trim( $line ) || preg_match( '/^\s*#/', $line ) ) {
+			continue;
+		}
+
+		if ( 'netlify_redirects' === $kind ) {
+			$parts = preg_split( '/\s+/', trim( $line ) );
+			if ( count( $parts ) < 2 || ! str_starts_with( $parts[0], '/' ) || preg_match( '/[\r\n]/', $line ) ) {
+				return sprintf( __( 'Line %d must contain a source path and destination.', 'funkycommerce-headless' ), $line_number + 1 );
+			}
+			if ( isset( $parts[2] ) && ! preg_match( '/^[2-5][0-9]{2}!?(?:$)/', $parts[2] ) ) {
+				return sprintf( __( 'Line %d has an invalid redirect status.', 'funkycommerce-headless' ), $line_number + 1 );
+			}
+			foreach ( array_slice( $parts, 3 ) as $option ) {
+				if ( ! preg_match( '/^[A-Za-z][A-Za-z0-9_-]*=[A-Za-z0-9_.*,:-]+$/', $option ) ) {
+					return sprintf( __( 'Line %d has an invalid redirect option.', 'funkycommerce-headless' ), $line_number + 1 );
+				}
+			}
+			continue;
+		}
+
+		if ( preg_match( '/^[ \t]/', $line ) ) {
+			if ( ! $has_header_path || ! preg_match( '/^[ \t]+([!#$%&\\x27*+.^_`|~0-9A-Za-z-]+):[ \t]*([^\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]*)$/', $line ) ) {
+				return sprintf( __( 'Line %d must be a valid indented header following a path.', 'funkycommerce-headless' ), $line_number + 1 );
+			}
+			continue;
+		}
+		if ( ! str_starts_with( trim( $line ), '/' ) || preg_match( '/\s/', trim( $line ) ) ) {
+			return sprintf( __( 'Line %d must be a path beginning with /.', 'funkycommerce-headless' ), $line_number + 1 );
+		}
+		$has_header_path = true;
+	}
+
+	return '';
 }
 
 /**
@@ -801,7 +884,7 @@ function funkycommerce_storefront_control_settings( $language = '' ) {
 	$assistant_show_footer = $has_surface_settings ? 'yes' === $settings['ai_assistant_show_footer'] : 'footer' === $legacy_placement;
 	$assistant_show_fixed  = $has_surface_settings ? 'yes' === $settings['ai_assistant_show_fixed'] : 'fixed' === $legacy_placement;
 	$assistant_placement   = $assistant_show_header ? 'header' : ( $assistant_show_fixed ? 'fixed' : 'footer' );
-	$default_theme_credit  = 'Made with <a href="https://superfunky.pro" target="_blank" rel="noopener noreferrer">superfuky WP theme</a> by <a href="https://codedletter.com" target="_blank" rel="noopener noreferrer">Coded Letter</a>.';
+	$default_theme_credit  = 'Made with <a href="https://superfunky.pro" target="_blank" rel="noopener noreferrer">FunkyCommerce WordPress theme</a> by <a href="https://codedletter.com" target="_blank" rel="noopener noreferrer">Coded Letter</a>.';
 	$theme_credit          = funkycommerce_is_pro()
 		? wp_kses_post( (string) ( $settings['theme_credit_text'] ?? $default_theme_credit ) )
 		: $default_theme_credit;

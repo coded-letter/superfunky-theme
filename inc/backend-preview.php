@@ -367,6 +367,18 @@ function funkycommerce_backend_preview_enqueue_styles() {
 	if ( ! funkycommerce_backend_preview_active() ) {
 		return;
 	}
+
+	$tailwind_css_path = get_theme_file_path( 'assets/dist/theme.css' );
+	if ( file_exists( $tailwind_css_path ) ) {
+		$theme_version = wp_get_theme()->get( 'Version' );
+		wp_enqueue_style(
+			'funkycommerce-backend-preview-tailwind',
+			get_theme_file_uri( 'assets/dist/theme.css' ),
+			array(),
+			$theme_version ? $theme_version : filemtime( $tailwind_css_path )
+		);
+	}
+
 	wp_register_style( 'funkycommerce-backend-preview', false, array(), FUNKYCOMMERCE_HEADLESS_VERSION );
 	wp_enqueue_style( 'funkycommerce-backend-preview' );
 	wp_add_inline_style( 'funkycommerce-backend-preview', funkycommerce_backend_preview_styles_css() );

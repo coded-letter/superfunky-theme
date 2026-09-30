@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.54
+Stable tag: 1.2.55
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,7 +36,13 @@ With the matching storefront, deferred styles activate on window load or after
 two seconds, with a no-JavaScript fallback. Rebuild the storefront after saving to
 publish static pages. Older storefronts apply all CSS immediately.
 
-== 1.2.54 candidate ==
+== 1.2.55 ==
+
+* Adds the Control Center inputs for Netlify redirects and security headers, and emits them with static storefront builds.
+* Styles authenticated backend previews with the theme's compiled Tailwind utilities.
+* Improves preview integration, SEO metadata, and editor-facing storefront behavior.
+
+== 1.2.54 ==
 
 * Excludes media attachments at the Tailwind inventory query boundary, reducing build traffic before incremental comparison.
 * Supports safely paced one-time frontend extractor policy upgrades without adding work to WordPress saves.
