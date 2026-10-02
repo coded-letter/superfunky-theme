@@ -4,11 +4,11 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.55
+Stable tag: 1.2.56
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-This block theme is the WordPress control plane for the FunkyCommerce storefront.
+This block theme is the WordPress control plane for the Superfunky storefront.
 By default it renders a minimal, headless-only shell because customer-facing output is
 served by the separate headless application. When headless mode is disabled in the
 Control Center, the theme also ships a complete native WordPress rendering path (see
@@ -32,9 +32,16 @@ the deferred editor removes that layer. Legacy markers remain supported.
 The existing customCss output and legacy option combine both editors with the
 same marker; no GraphQL schema change is required. WordPress Additional CSS keeps
 its existing position and stays critical unless it explicitly uses the marker.
-With the matching storefront, deferred styles activate on window load or after
-two seconds, with a no-JavaScript fallback. Rebuild the storefront after saving to
+With the matching storefront, static builds keep deferred styles in a
+non-render-blocking stylesheet. They activate on window load or after two seconds,
+with a no-JavaScript stylesheet fallback. Rebuild the storefront after saving to
 publish static pages. Older storefronts apply all CSS immediately.
+
+== 1.2.56 ==
+
+* Uses Superfunky branding in the theme description and default storefront credit.
+* Changes the default public order-number prefix to "order".
+* Publishes deferred custom CSS as a separate non-render-blocking storefront asset, with a no-JavaScript fallback.
 
 == 1.2.55 ==
 

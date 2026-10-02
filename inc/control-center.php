@@ -884,9 +884,15 @@ function funkycommerce_storefront_control_settings( $language = '' ) {
 	$assistant_show_footer = $has_surface_settings ? 'yes' === $settings['ai_assistant_show_footer'] : 'footer' === $legacy_placement;
 	$assistant_show_fixed  = $has_surface_settings ? 'yes' === $settings['ai_assistant_show_fixed'] : 'fixed' === $legacy_placement;
 	$assistant_placement   = $assistant_show_header ? 'header' : ( $assistant_show_fixed ? 'fixed' : 'footer' );
-	$default_theme_credit  = 'Made with <a href="https://superfunky.pro" target="_blank" rel="noopener noreferrer">FunkyCommerce WordPress theme</a> by <a href="https://codedletter.com" target="_blank" rel="noopener noreferrer">Coded Letter</a>.';
+	$default_theme_credit    = 'Made with <a href="https://superfunky.pro" target="_blank" rel="noopener noreferrer">Superfunky WordPress theme</a> by <a href="https://codedletter.com" target="_blank" rel="noopener noreferrer">Coded Letter</a>.';
+	$configured_theme_credit = (string) ( $settings['theme_credit_text'] ?? $default_theme_credit );
+	$legacy_theme_credit     = 'Made with <a href="https://superfunky.pro" target="_blank" rel="noopener noreferrer">FunkyCommerce WordPress theme</a> by <a href="https://codedletter.com" target="_blank" rel="noopener noreferrer">Coded Letter</a>.';
+	// Replace only the former default; preserve any user-customized credit.
+	if ( $legacy_theme_credit === $configured_theme_credit ) {
+		$configured_theme_credit = $default_theme_credit;
+	}
 	$theme_credit          = funkycommerce_is_pro()
-		? wp_kses_post( (string) ( $settings['theme_credit_text'] ?? $default_theme_credit ) )
+		? wp_kses_post( $configured_theme_credit )
 		: $default_theme_credit;
 
 	return array(
