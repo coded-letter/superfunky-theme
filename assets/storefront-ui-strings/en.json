@@ -140,6 +140,7 @@
   "order_success.payment.bacs": "Direct bank transfer",
   "order_success.payment.crypto": "Cryptocurrency payment",
   "order_success.payment.blik": "BLIK",
+  "order_success.blik_follow_up_notice": "Stripe confirmed your BLIK payment. Your order is still being updated; do not pay again. Contact support if the order status does not update.",
   "order_success.payment.card": "Card payment",
   "order_success.row.subtotal": "Subtotal",
   "order_success.row.discount": "Discount",

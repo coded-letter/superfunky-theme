@@ -140,6 +140,7 @@
   "order_success.payment.bacs": "銀行振込",
   "order_success.payment.crypto": "暗号資産決済",
   "order_success.payment.blik": "BLIK",
+  "order_success.blik_follow_up_notice": "StripeでBLIK決済が確認されました。注文状況は更新中です。決済を再度行わないでください。注文状況が更新されない場合はサポートへお問い合わせください。",
   "order_success.payment.card": "カード決済",
   "order_success.row.subtotal": "小計",
   "order_success.row.discount": "割引",

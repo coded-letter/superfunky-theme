@@ -50,16 +50,16 @@ test("saved positive overrides remain shared while an absent override inherits W
   assert.match(field, /'min' => '0'/);
 });
 
-test("reading and WooCommerce option changes invalidate prerender settings and schedule rebuilding", () => {
+test("reading and WooCommerce option changes invalidate prerender settings without triggering deployment builds", () => {
   for (const option of ["posts_per_page", "woocommerce_catalog_columns", "woocommerce_catalog_rows"]) {
     assert.ok(settings.includes(`'${option}'`));
   }
   for (const hook of ["updated_option", "added_option", "deleted_option"]) {
     assert.ok(settings.includes(`add_action( '${hook}', 'funkycommerce_collect_archive_setting_change', 30 )`));
   }
-  assert.match(settings, /funkycommerce_schedule_content_build\(\)/);
+  assert.doesNotMatch(settings, /funkycommerce_schedule_content_build\(\)/);
   assert.match(settings, /array\( 'config:storefront' \)/);
-  assert.match(source("inc/artifact-invalidation.php"), /function funkycommerce_collect_control_center_change[\s\S]*funkycommerce_schedule_content_build\(\)/);
+  assert.doesNotMatch(source("inc/artifact-invalidation.php"), /funkycommerce_schedule_content_build\(\)/);
 });
 
 test("native and headless grid markers inherit settings unless the editor specifies a positive size", () => {

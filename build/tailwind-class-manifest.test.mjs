@@ -11,9 +11,11 @@ const style = source("style.css");
 const webhooks = source("inc/build-webhooks.php");
 const parser = new Engine({ parser: { suppressErrors: false } });
 
-test("theme 1.2.55 retains the one-time Tailwind worker cleanup", () => {
+test("theme bootstrap retains the one-time Tailwind worker cleanup", () => {
   assert.doesNotThrow(() => parser.parseCode(cleanup));
-  assert.match(functions, /FUNKYCOMMERCE_HEADLESS_VERSION', '1\.2\.55'/);
+  const themeVersion = style.match(/^Version:\s*(.+)$/m)?.[1];
+  assert.ok(themeVersion);
+  assert.ok(functions.includes(`define( 'FUNKYCOMMERCE_HEADLESS_VERSION', '${themeVersion}' );`));
   assert.match(functions, /require_once .*\/inc\/tailwind-manifest-cleanup\.php'/);
   assert.doesNotMatch(functions, /tailwind-class-manifest\.php/);
 });
@@ -44,7 +46,8 @@ test("one-time cleanup removes every legacy Tailwind worker and aggregate option
 
 test("storefront build webhooks no longer depend on a CMS Tailwind manifest", () => {
   assert.doesNotMatch(webhooks, /tailwindManifest|tailwind_manifest|funkycommerce_tailwind/);
-  assert.match(webhooks, /add_action\( 'save_post', 'funkycommerce_schedule_post_build', 20, 3 \)/);
+  assert.doesNotMatch(webhooks, /add_action\( 'save_post'/);
+  assert.match(webhooks, /'manual_admin_bar' === \$reason/);
 });
 
 test("the editor keeps the corrected single compiled stylesheet path", () => {
