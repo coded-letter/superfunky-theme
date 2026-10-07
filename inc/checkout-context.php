@@ -734,15 +734,29 @@ function funkycommerce_checkout_order_from_credentials( $order_id, $order_key, $
  * Complete a verified BLIK charge through Woo Stripe's native gateway response handler.
  */
 function funkycommerce_process_verified_blik_charge( $order, $intent ) {
-	$charge = $intent->latest_charge ?? null;
+	$charge         = $intent->latest_charge ?? null;
+	$charge_id      = is_object( $charge ) ? (string) ( $charge->id ?? '' ) : '';
+	$intent_amount  = (int) ( $intent->amount ?? -1 );
+	$charge_amount  = is_object( $charge ) ? (int) ( $charge->amount ?? -1 ) : -1;
+	$captured_amount = is_object( $charge ) ? (int) ( $charge->amount_captured ?? -1 ) : -1;
 	if (
 		! is_object( $charge )
 		|| 'charge' !== ( $charge->object ?? '' )
 		|| 'succeeded' !== ( $charge->status ?? '' )
-		|| 0 !== strpos( (string) ( $charge->id ?? '' ), 'ch_' )
+		|| 'blik' !== ( $charge->payment_method_details->type ?? '' )
+		|| '' === $charge_id
 		|| ! hash_equals( (string) ( $intent->id ?? '' ), (string) ( $charge->payment_intent ?? '' ) )
+		|| 'succeeded' !== ( $intent->status ?? '' )
+		|| true !== ( $charge->captured ?? false )
+		|| true !== ( $charge->paid ?? false )
+		|| $intent_amount < 0
+		|| $charge_amount !== $intent_amount
+		|| $captured_amount !== $intent_amount
+		|| strtolower( (string) ( $charge->currency ?? '' ) ) !== strtolower( (string) ( $intent->currency ?? '' ) )
+		|| ! empty( $charge->review )
+		|| 'manual_review' === ( $charge->outcome->type ?? '' )
 	) {
-		throw new \RuntimeException( 'Stripe did not return a succeeded charge for the verified BLIK intent.' );
+		throw new \RuntimeException( 'Stripe did not return a captured, paid BLIK charge eligible for automatic completion.' );
 	}
 
 	if ( ! $order->has_status( array( 'pending', 'failed', 'on-hold' ) ) ) {
@@ -750,27 +764,58 @@ function funkycommerce_process_verified_blik_charge( $order, $intent ) {
 	}
 
 	$order_helper = \WC_Stripe_Order_Helper::get_instance();
-	if (
-		method_exists( $order_helper, 'is_order_payment_locked' )
-		&& $order_helper->is_order_payment_locked( $order )
-	) {
-		throw new \RuntimeException( 'The BLIK order is already locked for Stripe payment processing.' );
-	}
 
 	$gateways = WC()->payment_gateways()->payment_gateways();
 	$gateway  = $gateways['stripe'] ?? null;
-	if ( ! $gateway instanceof \WC_Payment_Gateway || ! is_callable( array( $gateway, 'process_response' ) ) ) {
-		throw new \RuntimeException( 'WooCommerce Stripe gateway cannot process the verified BLIK charge.' );
+
+	if ( class_exists( 'WC_Stripe_Helper' ) && is_callable( array( 'WC_Stripe_Helper', 'get_order_by_charge_id' ) ) ) {
+		$charge_order = \WC_Stripe_Helper::get_order_by_charge_id( $charge_id );
+		if ( $charge_order instanceof \WC_Order && (int) $charge_order->get_id() !== (int) $order->get_id() ) {
+			throw new \RuntimeException( 'The verified BLIK charge is already linked to a different WooCommerce order.' );
+		}
 	}
 
 	$charge->is_webhook_response = true;
-	$gateway->process_response( $charge, $order );
+	$gateway_error = null;
+	if ( $gateway instanceof \WC_Payment_Gateway && is_callable( array( $gateway, 'process_response' ) ) ) {
+		try {
+			$gateway->process_response( $charge, $order );
+		} catch ( \Throwable $error ) {
+			$gateway_error = $error;
+			error_log( sprintf( 'WooCommerce Stripe charge handler failed for verified BLIK order %d: %s', $order->get_id(), $error->getMessage() ) );
+		}
+	} else {
+		$gateway_error = new \RuntimeException( 'WooCommerce Stripe gateway response handler is unavailable.' );
+		error_log( sprintf( 'WooCommerce Stripe gateway response handler is unavailable for verified BLIK order %d.', $order->get_id() ) );
+	}
+
+	$order = wc_get_order( $order->get_id() );
+	if ( ! $order->is_paid() ) {
+		if ( is_callable( array( $order_helper, 'sync_stripe_charge_captured' ) ) ) {
+			try {
+				$order_helper->sync_stripe_charge_captured( $order, $charge );
+			} catch ( \Throwable $sync_error ) {
+				error_log( sprintf( 'WooCommerce Stripe charge metadata sync failed for verified BLIK order %d: %s', $order->get_id(), $sync_error->getMessage() ) );
+			}
+		}
+		$order->add_order_note( __( 'WooCommerce Stripe did not complete this order in its charge handler. The theme completed it using the verified, captured Stripe BLIK charge.', 'funkycommerce-headless' ) );
+		$order->payment_complete( $charge_id );
+		$order = wc_get_order( $order->get_id() );
+	}
+	if ( ! $order->is_paid() ) {
+		throw new \RuntimeException(
+			sprintf(
+				'WooCommerce did not mark the verified, captured BLIK charge as paid.%s',
+				$gateway_error ? ' Stripe gateway error: ' . $gateway_error->getMessage() : ''
+			)
+		);
+	}
 }
 
 /**
- * Reconcile a BLIK intent through Woo Stripe's own verified webhook processing path.
+ * Reconcile an intent retrieved directly from Stripe using WooCommerce Stripe's native webhook handler.
  */
-function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
+function funkycommerce_reconcile_blik_order( \WP_REST_Request $request, $retry_attempt = 0, $expected_intent_id = '' ) {
 	$order = funkycommerce_checkout_order_from_credentials(
 		$request['id'],
 		sanitize_text_field( (string) $request->get_param( 'key' ) ),
@@ -802,7 +847,6 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 	if (
 		! class_exists( 'WC_Stripe_API' )
 		|| ! class_exists( 'WC_Stripe_Order_Helper' )
-		|| ! class_exists( 'WC_Stripe_Webhook_Handler' )
 	) {
 		return new \WP_Error(
 			'funkycommerce_stripe_unavailable',
@@ -820,6 +864,16 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 			'funkycommerce_blik_intent_missing',
 			__( 'WooCommerce has not recorded the BLIK payment intent yet.', 'funkycommerce-headless' ),
 			array( 'status' => 409 )
+		);
+	}
+	if ( '' !== $expected_intent_id && ! hash_equals( (string) $expected_intent_id, $intent_id ) ) {
+		error_log( sprintf( 'FunkyCommerce skipped a stale BLIK reconciliation retry for order %d.', $order->get_id() ) );
+		return rest_ensure_response(
+			array(
+				'payment_status' => 'pending',
+				'intent_status'  => 'unknown',
+				'order_status'   => $order->get_status(),
+			)
 		);
 	}
 
@@ -856,17 +910,21 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 		}
 
 		if ( $event_type ) {
-			$notification = (object) array(
-				'type' => $event_type,
-				'data' => (object) array( 'object' => $intent ),
-			);
-			$handler      = new \WC_Stripe_Webhook_Handler();
 			$handler_error = null;
 			$deferred      = false;
-			try {
-				$deferred = true === $handler->process_payment_intent( $notification );
-			} catch ( \Throwable $error ) {
-				$handler_error = $error;
+			if ( class_exists( 'WC_Stripe_Webhook_Handler' ) ) {
+				$notification = (object) array(
+					'type' => $event_type,
+					'data' => (object) array( 'object' => $intent ),
+				);
+				$handler      = new \WC_Stripe_Webhook_Handler();
+				try {
+					$deferred = true === $handler->process_payment_intent( $notification );
+				} catch ( \Throwable $error ) {
+					$handler_error = $error;
+				}
+			} else {
+				$handler_error = new \RuntimeException( 'WooCommerce Stripe webhook handler is unavailable.' );
 			}
 			$order = wc_get_order( $order->get_id() );
 			// A deferred webhook result is not proof that a succeeded intent completed the order.
@@ -897,17 +955,6 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 		}
 	} catch ( \Throwable $error ) {
 		error_log( sprintf( 'FunkyCommerce BLIK reconciliation failed for order %d: %s', $order->get_id(), $error->getMessage() ) );
-		funkycommerce_emit_notification(
-			'theme.crypto_payment_failed',
-			__( 'BLIK order reconciliation needs attention', 'funkycommerce-headless' ),
-			__( 'WooCommerce could not finish updating this BLIK order from Stripe payment status. Review Stripe and the order before taking further payment action.', 'funkycommerce-headless' ),
-			array(
-				__( 'Order ID', 'funkycommerce-headless' )      => $order->get_id(),
-				__( 'Gateway', 'funkycommerce-headless' )       => 'stripe-blik',
-				__( 'Intent status', 'funkycommerce-headless' ) => $intent_status,
-			),
-			$order->get_edit_order_url()
-		);
 		if ( $intent_matches_order && 'succeeded' === $intent_status ) {
 			$order = wc_get_order( $order->get_id() );
 			if ( $order->is_paid() ) {
@@ -919,6 +966,19 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 					)
 				);
 			}
+			if ( 0 === absint( $retry_attempt ) ) {
+				funkycommerce_emit_notification(
+					'theme.crypto_payment_failed',
+					__( 'BLIK order reconciliation needs attention', 'funkycommerce-headless' ),
+					__( 'WooCommerce could not finish updating this BLIK order from Stripe payment status. Review Stripe and the order before taking further payment action.', 'funkycommerce-headless' ),
+					array(
+						__( 'Order ID', 'funkycommerce-headless' )      => $order->get_id(),
+						__( 'Gateway', 'funkycommerce-headless' )       => 'stripe-blik',
+						__( 'Intent status', 'funkycommerce-headless' ) => $intent_status,
+					),
+					$order->get_edit_order_url()
+				);
+			}
 
 			return rest_ensure_response(
 				array(
@@ -927,6 +987,19 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 					'order_status'                => $order->get_status(),
 					'payment_follow_up_required' => true,
 				)
+			);
+		}
+		if ( 0 === absint( $retry_attempt ) ) {
+			funkycommerce_emit_notification(
+				'theme.crypto_payment_failed',
+				__( 'BLIK order reconciliation needs attention', 'funkycommerce-headless' ),
+				__( 'WooCommerce could not finish updating this BLIK order from Stripe payment status. Review Stripe and the order before taking further payment action.', 'funkycommerce-headless' ),
+				array(
+					__( 'Order ID', 'funkycommerce-headless' )      => $order->get_id(),
+					__( 'Gateway', 'funkycommerce-headless' )       => 'stripe-blik',
+					__( 'Intent status', 'funkycommerce-headless' ) => $intent_status,
+				),
+				$order->get_edit_order_url()
 			);
 		}
 		return new \WP_Error(
@@ -972,6 +1045,40 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 		)
 	);
 }
+
+/**
+ * Process legacy queued BLIK retries once; new retries are delivered by Stripe webhooks.
+ */
+function funkycommerce_reconcile_blik_order_retry( $order_id, $intent_id, $attempt ) {
+	$order_id = absint( $order_id );
+	$attempt  = absint( $attempt );
+	$order    = wc_get_order( $order_id );
+	if (
+		! $order instanceof \WC_Order
+		|| 'stripe_blik' !== $order->get_payment_method()
+		|| $order->is_paid()
+		|| ! is_string( $intent_id )
+		|| ( '' !== $intent_id && 0 !== strpos( $intent_id, 'pi_' ) )
+		|| $attempt < 1
+		|| $attempt > 10
+	) {
+		return;
+	}
+
+	$request = new \WP_REST_Request( 'POST', sprintf( '/funkycommerce/v1/orders/%d/reconcile-blik', $order_id ) );
+	$request->set_param( 'id', $order_id );
+	$request->set_param( 'key', $order->get_order_key() );
+	$request->set_param( 'email', $order->get_billing_email() );
+	try {
+		$result = funkycommerce_reconcile_blik_order( $request, $attempt, $intent_id );
+		if ( is_wp_error( $result ) ) {
+			error_log( sprintf( 'FunkyCommerce BLIK retry %d failed for order %d: %s', $attempt, $order_id, $result->get_error_message() ) );
+		}
+	} catch ( \Throwable $error ) {
+		error_log( sprintf( 'FunkyCommerce BLIK retry %d failed for order %d: %s', $attempt, $order_id, $error->getMessage() ) );
+	}
+}
+add_action( 'funkycommerce_reconcile_blik_order_retry', 'funkycommerce_reconcile_blik_order_retry', 10, 3 );
 
 function funkycommerce_register_blik_reconciliation_rest() {
 	register_rest_route(
