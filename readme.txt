@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.59
+Stable tag: 1.2.65
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -49,6 +49,36 @@ processing deferred the order update.
 If Stripe confirms payment but the order still cannot be reconciled automatically,
 checkout reports the payment as processing, not as a failed payment, and warns the
 customer not to pay again while the order is reviewed.
+
+Stripe's native WooCommerce webhook remains the event-driven source of truth. Ensure
+the webhook configured in WooCommerce Stripe is healthy and includes the payment
+events required by that plugin. The theme does not register a second webhook endpoint
+or require a second signing secret; its checkout reconciliation also retrieves the
+PaymentIntent through WooCommerce Stripe and applies the plugin's native handler.
+
+== 1.2.65 ==
+
+* Uses WooCommerce Stripe's configured webhook as the only asynchronous event source; no separate theme webhook secret or endpoint is required.
+* Removes new Action Scheduler BLIK retries and prevents Stripe payment locks or charge metadata-sync errors from blocking verified WooCommerce completion.
+
+== 1.2.64 ==
+
+* Completes an order through WooCommerce core when Stripe's charge response handler throws or does not update it, after verifying the charge matches the succeeded PaymentIntent's amount and currency; manual-review and charge-already-used cases remain held.
+* Caps server-side BLIK reconciliation at five one-minute retries.
+
+== 1.2.63 ==
+
+== 1.2.62 ==
+
+* Accepts Stripe's current BLIK charge identifier format while still requiring a succeeded charge tied to the verified order PaymentIntent.
+
+== 1.2.61 ==
+
+* Retries verified successful BLIK order reconciliation server-side for up to ten minutes so temporary Stripe payment locks or delayed processing no longer depend on the shopper's browser remaining open.
+
+== 1.2.60 ==
+
+* Fixes the BLIK recovery path to inspect Stripe payment locks through WooCommerce Stripe's public API, allowing verified successful charges to complete instead of failing on a protected-method call.
 
 == 1.2.59 ==
 
