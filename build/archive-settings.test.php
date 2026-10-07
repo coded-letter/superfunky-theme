@@ -88,7 +88,7 @@ foreach ( array( 'updated_option', 'added_option', 'deleted_option' ) as $hook )
 		}
 	}
 }
-expect_same( 9, $builds, 'Only native archive option changes schedule builds' );
+expect_same( 0, $builds, 'Archive setting changes do not trigger deployment builds' );
 expect_same( 9, count( $invalidations ), 'Each relevant change invalidates hydration' );
 foreach ( $invalidations as $invalidation ) {
 	expect_same( array( array( 'config:storefront' ), 'archive_settings_changed' ), $invalidation, 'Settings dependency is invalidated' );

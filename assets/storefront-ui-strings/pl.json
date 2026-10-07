@@ -140,6 +140,7 @@
   "order_success.payment.bacs": "Przelew bankowy",
   "order_success.payment.crypto": "Płatność kryptowalutą",
   "order_success.payment.blik": "BLIK",
+  "order_success.blik_follow_up_notice": "Stripe potwierdził płatność BLIK. Status zamówienia jest aktualizowany — nie ponawiaj płatności. Jeśli status się nie zmieni, skontaktuj się z obsługą.",
   "order_success.payment.card": "Płatność kartą",
   "order_success.row.subtotal": "Suma częściowa",
   "order_success.row.discount": "Rabat",

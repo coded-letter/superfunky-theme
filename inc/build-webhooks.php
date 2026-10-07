@@ -1,6 +1,6 @@
 <?php
 /**
- * Storefront build webhook scheduling and content-change invalidation.
+ * Storefront deployment webhook and manual build action.
  *
  * @package FunkyCommerceHeadless
  */
@@ -11,6 +11,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const FUNKYCOMMERCE_BUILD_EVENT = 'funkycommerce_trigger_storefront_build';
 const FUNKYCOMMERCE_BUILD_DEBOUNCE_EVENT = 'funkycommerce_trigger_debounced_storefront_build';
+const FUNKYCOMMERCE_PERIODIC_BUILD_EVENT = 'funkycommerce_periodic_storefront_build';
+
+/**
+ * Remove legacy automatic build events; publishing is explicit from the admin bar.
+ */
+function funkycommerce_clear_automatic_build_events() {
+	wp_clear_scheduled_hook( FUNKYCOMMERCE_BUILD_EVENT );
+	wp_clear_scheduled_hook( FUNKYCOMMERCE_BUILD_DEBOUNCE_EVENT );
+}
+add_action( 'init', 'funkycommerce_clear_automatic_build_events', 1 );
 
 /**
  * Return only public controls consumed while generating storefront files.
@@ -168,7 +178,9 @@ add_action( 'graphql_register_types', 'funkycommerce_register_static_generation_
  * Trigger the configured deployment build hook.
  */
 function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
-	if ( ! funkycommerce_is_headless_mode() ) {
+	$manual_request   = 'manual_admin_bar' === $reason;
+	$periodic_request = 'periodic' === $reason && funkycommerce_periodic_build_enabled();
+	if ( ( ! $manual_request && ! $periodic_request ) || ! funkycommerce_is_headless_mode() ) {
 		return false;
 	}
 	$settings    = funkycommerce_control_center_settings();
@@ -226,7 +238,6 @@ function funkycommerce_trigger_storefront_build( $reason = 'scheduled' ) {
 	}
 	return true;
 }
-add_action( FUNKYCOMMERCE_BUILD_EVENT, 'funkycommerce_trigger_storefront_build' );
 
 /**
  * Add a manual storefront rebuild action and optional deployment status badge.
@@ -358,15 +369,20 @@ function funkycommerce_manual_storefront_build_notice() {
 add_action( 'admin_notices', 'funkycommerce_manual_storefront_build_notice' );
 
 /**
- * Preserve the content-change reason while keeping the debounce event argument-free.
+ * Whether the optional Pro periodic deployment build is currently enabled.
  */
-function funkycommerce_trigger_content_build() {
-	funkycommerce_trigger_storefront_build( 'content_changed' );
+function funkycommerce_periodic_build_enabled( $settings = null ) {
+	$settings = is_array( $settings ) ? $settings : funkycommerce_control_center_settings();
+	return function_exists( 'funkycommerce_is_pro' )
+		&& funkycommerce_is_pro()
+		&& funkycommerce_is_headless_mode()
+		&& 'build-webhook' === ( $settings['artifact_mode'] ?? 'build-webhook' )
+		&& 'yes' === ( $settings['periodic_rebuild'] ?? 'no' )
+		&& ! empty( $settings['build_webhook_url'] );
 }
-add_action( FUNKYCOMMERCE_BUILD_DEBOUNCE_EVENT, 'funkycommerce_trigger_content_build' );
 
 /**
- * Add the merchant-configured rebuild interval to WP-Cron.
+ * Add the merchant-configured interval to WP-Cron.
  */
 function funkycommerce_build_cron_schedules( $schedules ) {
 	$settings = funkycommerce_control_center_settings();
@@ -385,107 +401,66 @@ function funkycommerce_build_cron_schedules( $schedules ) {
 add_filter( 'cron_schedules', 'funkycommerce_build_cron_schedules' );
 
 /**
- * Apply periodic rebuild settings whenever they change.
+ * Schedule the next Pro periodic deployment build.
+ */
+function funkycommerce_schedule_periodic_build() {
+	$scheduled = wp_schedule_event(
+		time() + HOUR_IN_SECONDS,
+		'funkycommerce_rebuild_interval',
+		FUNKYCOMMERCE_PERIODIC_BUILD_EVENT
+	);
+	if ( is_wp_error( $scheduled ) || false === $scheduled ) {
+		error_log( 'FunkyCommerce could not schedule the Pro periodic storefront build.' );
+	}
+}
+
+/**
+ * Schedule a periodic build only when the Pro setting is enabled.
  */
 function funkycommerce_sync_build_schedule( $old_value = array(), $value = array() ) {
-	$next = wp_next_scheduled( FUNKYCOMMERCE_BUILD_EVENT );
-	if ( $next ) {
-		wp_unschedule_event( $next, FUNKYCOMMERCE_BUILD_EVENT );
+	$old_value = is_array( $old_value ) ? $old_value : array();
+	$value = is_array( $value ) ? $value : funkycommerce_control_center_settings();
+	$schedule_keys = array( 'artifact_mode', 'build_webhook_url', 'periodic_rebuild', 'rebuild_interval', 'headless_mode' );
+	$changed       = false;
+	foreach ( $schedule_keys as $key ) {
+		if ( ( $old_value[ $key ] ?? null ) !== ( $value[ $key ] ?? null ) ) {
+			$changed = true;
+			break;
+		}
+	}
+	if ( ! $changed ) {
+		return;
 	}
 
-	$value = is_array( $value ) ? $value : array();
-	if ( 'build-webhook' === ( $value['artifact_mode'] ?? 'build-webhook' ) && 'no' !== ( $value['headless_mode'] ?? 'yes' ) && 'yes' === ( $value['periodic_rebuild'] ?? 'no' ) && ! empty( $value['build_webhook_url'] ) ) {
-		wp_schedule_event( time() + HOUR_IN_SECONDS, 'funkycommerce_rebuild_interval', FUNKYCOMMERCE_BUILD_EVENT );
+	wp_clear_scheduled_hook( FUNKYCOMMERCE_PERIODIC_BUILD_EVENT );
+
+	if ( ! funkycommerce_periodic_build_enabled( $value ) ) {
+		return;
 	}
+
+	funkycommerce_schedule_periodic_build();
 }
 add_action( 'update_option_funkycommerce_control_center', 'funkycommerce_sync_build_schedule', 20, 2 );
 
 /**
- * Restore a missing recurring event after theme activation or a cron reset.
+ * Restore or remove the recurring event when settings or Pro access change.
  */
 function funkycommerce_ensure_build_schedule() {
-	if ( ! funkycommerce_is_headless_mode() ) {
+	$settings = funkycommerce_control_center_settings();
+	if ( ! funkycommerce_periodic_build_enabled( $settings ) ) {
+		wp_clear_scheduled_hook( FUNKYCOMMERCE_PERIODIC_BUILD_EVENT );
 		return;
 	}
-	$settings = funkycommerce_control_center_settings();
-	if (
-		'build-webhook' === funkycommerce_artifact_mode() &&
-		'yes' === ( $settings['periodic_rebuild'] ?? 'no' ) &&
-		! empty( $settings['build_webhook_url'] ) &&
-		! wp_next_scheduled( FUNKYCOMMERCE_BUILD_EVENT )
-	) {
-		wp_schedule_event( time() + HOUR_IN_SECONDS, 'funkycommerce_rebuild_interval', FUNKYCOMMERCE_BUILD_EVENT );
+	if ( ! wp_next_scheduled( FUNKYCOMMERCE_PERIODIC_BUILD_EVENT ) ) {
+		funkycommerce_schedule_periodic_build();
 	}
 }
 add_action( 'init', 'funkycommerce_ensure_build_schedule' );
 
 /**
- * Debounce publishing changes into one build request.
- *
- * Static storefront routes still require configured build hooks in shadow and
- * artifact modes.
+ * Dispatch the configured periodic build after verifying the Pro setting.
  */
-function funkycommerce_schedule_content_build() {
-	if ( ! funkycommerce_is_headless_mode() ) {
-		return;
-	}
-	$settings = funkycommerce_control_center_settings();
-	if ( empty( $settings['build_webhook_url'] ) || wp_next_scheduled( FUNKYCOMMERCE_BUILD_DEBOUNCE_EVENT ) ) {
-		return;
-	}
-
-	wp_schedule_single_event( time() + MINUTE_IN_SECONDS, FUNKYCOMMERCE_BUILD_DEBOUNCE_EVENT );
+function funkycommerce_trigger_periodic_storefront_build() {
+	funkycommerce_trigger_storefront_build( 'periodic' );
 }
-
-/**
- * Shared blocks and templates render publicly despite their private post types.
- */
-function funkycommerce_post_type_affects_storefront_build( $post_type_name ) {
-	$post_type = get_post_type_object( $post_type_name );
-	return ( $post_type && $post_type->public )
-		|| in_array( $post_type_name, array( 'wp_block', 'wp_template', 'wp_template_part' ), true );
-}
-
-/**
- * Rebuild only for content that can affect generated storefront routes.
- */
-function funkycommerce_schedule_post_build( $post_id, $post, $update ) {
-	unset( $update );
-	if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) || 'publish' !== $post->post_status ) {
-		return;
-	}
-	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
-		funkycommerce_schedule_content_build();
-	}
-}
-add_action( 'save_post', 'funkycommerce_schedule_post_build', 20, 3 );
-
-/**
- * Rebuild when public content is unpublished; save_post only handles published updates.
- */
-function funkycommerce_schedule_status_build( $new_status, $old_status, $post ) {
-	if ( $new_status === $old_status || ( 'publish' !== $new_status && 'publish' !== $old_status ) ) {
-		return;
-	}
-	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
-		funkycommerce_schedule_content_build();
-	}
-}
-add_action( 'transition_post_status', 'funkycommerce_schedule_status_build', 20, 3 );
-
-/**
- * Rebuild when a public content node is deleted.
- */
-function funkycommerce_schedule_deleted_post_build( $post_id, $post ) {
-	if ( funkycommerce_post_type_affects_storefront_build( $post->post_type ) ) {
-		funkycommerce_schedule_content_build();
-	}
-}
-add_action( 'deleted_post', 'funkycommerce_schedule_deleted_post_build', 20, 2 );
-add_action( 'created_term', 'funkycommerce_schedule_content_build' );
-add_action( 'edited_term', 'funkycommerce_schedule_content_build' );
-add_action( 'delete_term', 'funkycommerce_schedule_content_build' );
-add_action( 'profile_update', 'funkycommerce_schedule_content_build' );
-add_action( 'wp_update_nav_menu', 'funkycommerce_schedule_content_build' );
-add_action( 'wp_update_nav_menu_item', 'funkycommerce_schedule_content_build' );
-add_action( 'wp_delete_nav_menu', 'funkycommerce_schedule_content_build' );
+add_action( FUNKYCOMMERCE_PERIODIC_BUILD_EVENT, 'funkycommerce_trigger_periodic_storefront_build' );

@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.56
+Stable tag: 1.2.58
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,6 +36,29 @@ With the matching storefront, static builds keep deferred styles in a
 non-render-blocking stylesheet. They activate on window load or after two seconds,
 with a no-JavaScript stylesheet fallback. Rebuild the storefront after saving to
 publish static pages. Older storefronts apply all CSS immediately.
+
+== Stripe BLIK payments ==
+
+BLIK is provided by WooCommerce Stripe, not registered as a separate theme-owned
+payment gateway. Enable BLIK in WooCommerce Stripe's payment-method settings, then
+enable BLIK presentation under Superfunky > Control Center > Payments. The storefront
+exposes the enabled native Stripe BLIK method for PLN checkouts only. If a succeeded
+Stripe charge cannot be applied by delayed webhook processing, the theme uses
+WooCommerce Stripe's native charge-response handler to complete the verified order.
+If Stripe confirms payment but the order still cannot be reconciled automatically,
+checkout reports the payment as processing, not as a failed payment, and warns the
+customer not to pay again while the order is reviewed.
+
+== 1.2.58 ==
+
+* Restricts deployment webhook calls to the explicit top admin-bar rebuild action, apart from the optional Pro periodic schedule.
+* Stops settings, post, taxonomy, profile, and navigation edits from triggering immediate deployment builds while retaining artifact invalidation.
+
+== 1.2.57 ==
+
+* Reconciles verified Stripe BLIK charges through WooCommerce Stripe's native gateway response handler when webhook processing cannot finish the order.
+* Prevents completed BLIK payments from being presented as payment failures when order reconciliation needs follow-up.
+* Documents the native Stripe BLIK setup requirements in Control Center and theme settings.
 
 == 1.2.56 ==
 
@@ -217,7 +240,9 @@ the examples below use environment-variable names from the Superfunky storefront
    the top admin bar. Wait for the deploy badge to succeed before testing the public site.
 
 WordPress invalidation and artifact regeneration happen automatically, but they do not replace
-static-first public HTML. A storefront build is the explicit publish boundary. Until that build
+static-first public HTML. Settings and content changes do not trigger immediate deployment
+webhooks. Pro users using legacy build-webhook mode may enable Periodic rebuilds in Build &
+Deploy; otherwise, the admin-bar action is the explicit publish boundary. Until a deployment
 finishes, visitors continue receiving the previous known-good static deployment.
 
 To roll back, restore the previous static-host deployment. To return to proxy delivery, set

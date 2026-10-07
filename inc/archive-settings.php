@@ -66,7 +66,6 @@ function funkycommerce_collect_archive_setting_change( $option ) {
 	if ( ! in_array( $option, array( 'posts_per_page', 'woocommerce_catalog_columns', 'woocommerce_catalog_rows' ), true ) ) {
 		return;
 	}
-	funkycommerce_schedule_content_build();
 	funkycommerce_collect_artifact_changes(
 		array( 'config:storefront' ),
 		'archive_settings_changed'

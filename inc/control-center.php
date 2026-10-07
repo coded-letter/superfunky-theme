@@ -1557,7 +1557,7 @@ function funkycommerce_render_control_center() {
 										<li><?php esc_html_e( 'Set Frontend URL, a unique Artifact site key, and the same 32+ character signing secret in WordPress and the storefront deployment.', 'funkycommerce-headless' ); ?></li>
 										<li><?php esc_html_e( 'Validate generation in shadow mode. Confirm the Artifacts panel reports a healthy active shell, background runner, and no failed or exhausted current-shell jobs.', 'funkycommerce-headless' ); ?></li>
 										<li><?php esc_html_e( 'Set Dynamic content delivery to Serve generated artifacts and configure the storefront variables shown below.', 'funkycommerce-headless' ); ?></li>
-										<li><?php esc_html_e( 'Configure a build webhook. After editing content, use Rebuild storefront in the top admin bar and wait for the deployment badge to succeed.', 'funkycommerce-headless' ); ?></li>
+										<li><?php esc_html_e( 'Configure a build webhook. Settings and content edits do not start deployments; use Rebuild storefront in the top admin bar, or enable the optional Pro periodic schedule in legacy webhook mode, and wait for the deployment badge to succeed.', 'funkycommerce-headless' ); ?></li>
 									</ol>
 									<?php
 									$environment_example = implode(
