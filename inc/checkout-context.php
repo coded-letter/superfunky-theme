@@ -869,7 +869,8 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 				$handler_error = $error;
 			}
 			$order = wc_get_order( $order->get_id() );
-			if ( 'succeeded' === $intent_status && ! $deferred && ! $order->is_paid() ) {
+			// A deferred webhook result is not proof that a succeeded intent completed the order.
+			if ( 'succeeded' === $intent_status && ! $order->is_paid() ) {
 				try {
 					funkycommerce_process_verified_blik_charge( $order, $intent );
 				} catch ( \Throwable $fallback_error ) {
@@ -890,7 +891,7 @@ function funkycommerce_reconcile_blik_order( \WP_REST_Request $request ) {
 			} elseif ( $handler_error && ! $deferred ) {
 				throw $handler_error;
 			}
-			if ( 'succeeded' === $intent_status && ! $deferred && ! $order->is_paid() ) {
+			if ( 'succeeded' === $intent_status && ! $order->is_paid() ) {
 				throw new \RuntimeException( 'The verified BLIK charge did not complete its WooCommerce order.' );
 			}
 		}

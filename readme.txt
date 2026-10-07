@@ -4,7 +4,7 @@ Tags: headless, woocommerce, wpgraphql, full-site-editing
 Requires at least: 6.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.58
+Stable tag: 1.2.59
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -42,12 +42,17 @@ publish static pages. Older storefronts apply all CSS immediately.
 BLIK is provided by WooCommerce Stripe, not registered as a separate theme-owned
 payment gateway. Enable BLIK in WooCommerce Stripe's payment-method settings, then
 enable BLIK presentation under Superfunky > Control Center > Payments. The storefront
-exposes the enabled native Stripe BLIK method for PLN checkouts only. If a succeeded
-Stripe charge cannot be applied by delayed webhook processing, the theme uses
-WooCommerce Stripe's native charge-response handler to complete the verified order.
+exposes the enabled native Stripe BLIK method for PLN checkouts only. After Stripe
+confirms a succeeded intent, the theme applies WooCommerce Stripe's native
+charge-response handler whenever the order is still unpaid, including when webhook
+processing deferred the order update.
 If Stripe confirms payment but the order still cannot be reconciled automatically,
 checkout reports the payment as processing, not as a failed payment, and warns the
 customer not to pay again while the order is reviewed.
+
+== 1.2.59 ==
+
+* Completes Stripe-confirmed BLIK orders that remain pending when WooCommerce Stripe defers webhook processing.
 
 == 1.2.58 ==
 
